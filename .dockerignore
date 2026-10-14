@@ -1,0 +1,13 @@
+.git
+.github
+.gemini
+node_modules
+*/node_modules
+dist
+*/dist
+coverage
+*/coverage
+backend/bin
+*.log
+.env*
+.cursorrules

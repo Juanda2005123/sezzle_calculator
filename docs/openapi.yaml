@@ -1,0 +1,302 @@
+openapi: 3.1.0
+info:
+  title: Sezzle Precision Calculator API
+  version: 1.0.0
+  description: |
+    Production-grade arbitrary-precision arithmetic calculation engine.
+    Guarantees exact base-10 calculation precision (e.g. `0.1 + 0.2 = 0.3`) without IEEE 754 floating-point drift,
+    with 16-decimal-place deterministic rounding on irrational operations and a standardized error envelope.
+servers:
+  - url: http://localhost:8080
+    description: Standalone Go Backend Service
+  - url: http://localhost:3000
+    description: Containerized Frontend Service with Nginx Reverse Proxy
+paths:
+  /api/v1/health:
+    get:
+      summary: Health Check Endpoint
+      description: Returns service liveness and health status.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy and ready to accept requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /api/v1/calculate:
+    post:
+      summary: Execute Arithmetic Calculation
+      description: |
+        Executes arbitrary-precision arithmetic calculations across 7 operations:
+        `add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, and `percent`.
+      tags:
+        - Calculation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculateRequest'
+            examples:
+              addition:
+                summary: Decimal Addition (0.1 + 0.2)
+                value:
+                  operation: add
+                  operand_a: "0.1"
+                  operand_b: "0.2"
+              square_root:
+                summary: Unary Square Root (sqrt(144))
+                value:
+                  operation: sqrt
+                  operand_a: "144"
+              exponentiation:
+                summary: Power (2 ^ 8)
+                value:
+                  operation: power
+                  operand_a: "2"
+                  operand_b: "8"
+              percentage_unary:
+                summary: Unary Percentage (50% = 0.5)
+                value:
+                  operation: percent
+                  operand_a: "50"
+              percentage_binary:
+                summary: Binary Percentage (20% of 150 = 30)
+                value:
+                  operation: percent
+                  operand_a: "20"
+                  operand_b: "150"
+      responses:
+        '200':
+          description: Calculation executed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculateResponse'
+              examples:
+                addition_result:
+                  summary: Addition Result
+                  value:
+                    data:
+                      operation: add
+                      operand_a: "0.1"
+                      operand_b: "0.2"
+                      result: 0.3
+                      formatted: "0.3"
+                      expression: "0.1 + 0.2 = 0.3"
+                sqrt_result:
+                  summary: Square Root Result
+                  value:
+                    data:
+                      operation: sqrt
+                      operand_a: "144"
+                      result: 12
+                      formatted: "12"
+                      expression: "sqrt(144) = 12"
+        '400':
+          description: Bad Request (malformed JSON, invalid operand, unsupported operation, or invalid arity).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                malformed_json:
+                  summary: Malformed JSON Syntax
+                  value:
+                    error:
+                      code: ERR_MALFORMED_JSON
+                      message: Request payload contains invalid or malformed JSON syntax.
+                invalid_operand:
+                  summary: Non-Numeric Operand
+                  value:
+                    error:
+                      code: ERR_INVALID_OPERAND
+                      message: Operand must be a valid non-empty numeric decimal string or number.
+                unsupported_operation:
+                  summary: Unsupported Operation
+                  value:
+                    error:
+                      code: ERR_UNSUPPORTED_OPERATION
+                      message: "Unsupported operation 'modulo'. Supported operations are: add, subtract, multiply, divide, power, sqrt, percent."
+                invalid_arity:
+                  summary: Invalid Arity
+                  value:
+                    error:
+                      code: ERR_INVALID_ARITY
+                      message: Binary operation requires both operand_a and operand_b.
+        '405':
+          description: Method Not Allowed (only POST is accepted).
+          headers:
+            Allow:
+              schema:
+                type: string
+                example: "POST, OPTIONS"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: ERR_METHOD_NOT_ALLOWED
+                  message: Method not allowed. Only POST is accepted.
+        '413':
+          description: Content Too Large (payload exceeds 4096 bytes).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: ERR_PAYLOAD_TOO_LARGE
+                  message: Request payload exceeds maximum permitted size of 4096 bytes.
+        '422':
+          description: Unprocessable Entity (mathematical domain constraint violation or numeric overflow).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                division_by_zero:
+                  summary: Division by Zero
+                  value:
+                    error:
+                      code: ERR_DIVISION_BY_ZERO
+                      message: Division by zero (a / 0) or zero raised to a negative exponent (0 ^ -b).
+                      details: division by zero
+                negative_radicand:
+                  summary: Square Root of Negative Number
+                  value:
+                    error:
+                      code: ERR_NEGATIVE_RADICAND
+                      message: Square root of a negative radicand is undefined in real numbers.
+                      details: radicand is negative
+                complex_result:
+                  summary: Complex Exponentiation Result
+                  value:
+                    error:
+                      code: ERR_COMPLEX_RESULT
+                      message: Negative base with fractional exponent produces a complex number.
+                numeric_overflow:
+                  summary: Magnitude Overflow
+                  value:
+                    error:
+                      code: ERR_NUMERIC_OVERFLOW
+                      message: Number magnitude exceeds maximum supported boundary (10^1000).
+        '500':
+          description: Internal Server Error (panic recovery interception).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: ERR_INTERNAL
+                  message: An unexpected internal server error occurred.
+
+components:
+  schemas:
+    Operation:
+      type: string
+      enum:
+        - add
+        - subtract
+        - multiply
+        - divide
+        - power
+        - sqrt
+        - percent
+      example: add
+
+    CalculateRequest:
+      type: object
+      required:
+        - operation
+        - operand_a
+      properties:
+        operation:
+          $ref: '#/components/schemas/Operation'
+        operand_a:
+          oneOf:
+            - type: string
+            - type: number
+          description: First operand. Can be sent as JSON string or number.
+          example: "0.1"
+        operand_b:
+          oneOf:
+            - type: string
+            - type: number
+            - type: "null"
+          description: Second operand. Required for binary operations; omitted or null for sqrt and unary percent.
+          example: "0.2"
+
+    CalculationData:
+      type: object
+      required:
+        - operation
+        - operand_a
+        - result
+        - formatted
+        - expression
+      properties:
+        operation:
+          $ref: '#/components/schemas/Operation'
+        operand_a:
+          type: string
+          example: "0.1"
+        operand_b:
+          type: string
+          nullable: true
+          example: "0.2"
+        result:
+          type: number
+          description: Exact numeric result serialized as an unquoted JSON number literal.
+          example: 0.3
+        formatted:
+          type: string
+          description: Formatted canonical string representation with trailing zeros stripped.
+          example: "0.3"
+        expression:
+          type: string
+          description: Human-readable expression equation.
+          example: "0.1 + 0.2 = 0.3"
+
+    CalculateResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/CalculationData'
+
+    ApiErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: ERR_DIVISION_BY_ZERO
+        message:
+          type: string
+          example: Division by zero is undefined.
+        details:
+          type: string
+          example: operand_b was 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiErrorDetail'

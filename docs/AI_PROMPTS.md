@@ -209,3 +209,46 @@ Establish an exhaustive Vitest + React Testing Library suite across all frontend
   - **Test Case 4 (Physical Keyboard Navigation & Viewport):** Dispatched `5`, `0`, `%` via window keydown events -> verified `0.5`. Verified viewport width and document scroll width confirming zero horizontal overflow.
   - **Console Error Audit:** Verified **0 console errors** and 0 uncaught exceptions throughout the session.
 - **Clean Teardown:** Terminated background Go and Vite processes; confirmed ports 8080 and 5173 were released.
+
+---
+
+## Phase 6: Containerization, Smoke Testing, CI, OpenAPI & Production README
+
+### 1. Objective
+Deliver production-grade infrastructure, containerization, and comprehensive project documentation. This comprises multi-stage Dockerfiles for Go backend and React frontend, Nginx reverse-proxy configuration, unified Docker Compose orchestration with healthchecks, an automated smoke testing script, GitHub Actions CI workflow, OpenAPI 3.1 specification, and a complete architectural README.
+
+### 2. Infrastructure & Delivery Specifications
+- **Backend Containerization (`backend/Dockerfile`):**
+  - Multi-stage build using `golang:1.24-alpine` compiling static binaries with `-ldflags="-s -w"`.
+  - Minimal runtime using `gcr.io/distroless/static-debian12:nonroot` running as `nonroot:nonroot` on port 8080.
+  - Built-in static healthcheck binary (`/bin/healthcheck`) compiled from `cmd/healthcheck/main.go` enabling zero-shell health checking inside distroless.
+- **Frontend Containerization (`frontend/Dockerfile` & `frontend/nginx.conf`):**
+  - Multi-stage build using `node:22-alpine` (`npm ci` and `npm run build`).
+  - Runtime using `nginx:1.27-alpine` serving the compiled static bundle on port 80.
+  - Nginx configuration with `/api/` reverse proxy to `http://backend:8080/api/` enabling same-origin communication without CORS overhead in containerized mode.
+  - SPA fallback (`try_files $uri $uri/ /index.html`) and static asset cache headers.
+- **Unified Orchestration (`docker-compose.yml`):**
+  - `backend` service exposing port `8080:8080` with native healthcheck hitting `/api/v1/health`.
+  - `frontend` service exposing port `3000:80` depending on `backend` with `condition: service_healthy`, preventing startup race conditions.
+- **Automated Smoke Testing (`scripts/smoke-test.sh`):**
+  - Polls backend `/api/v1/health` until healthy (up to 30s).
+  - Validates frontend availability on port 3000 (HTTP 200).
+  - Verifies decimal precision addition (`0.1 + 0.2 = 0.3`) through Nginx frontend proxy.
+  - Verifies division-by-zero error handling (HTTP 422 with `ERR_DIVISION_BY_ZERO`).
+  - Explicit exit codes (`exit 0` on success, `exit 1` on failure).
+- **GitHub Actions CI Workflow (`.github/workflows/ci.yml`):**
+  - Multi-job pipeline executing on `push` and `pull_request` to `main`:
+    1. Backend: Go 1.24 setup, dependency verification, `go test -v -race -coverprofile=coverage.out ./...`, coverage verification, and binary build.
+    2. Frontend: Node 22 setup, `npm ci`, `npm run test:coverage`, and `npm run build`.
+    3. Docker: Multi-stage container build verification (`docker compose build`).
+- **OpenAPI 3.1 Specification (`docs/openapi.yaml`):**
+  - Comprehensive specification covering `POST /api/v1/calculate` and `GET /api/v1/health`.
+  - Full request/response schemas, binary/unary examples, and structured error taxonomy (400, 405, 413, 422, 500).
+- **Production `README.md`:**
+  - Complete architectural documentation, Mermaid ASCII diagrams, zero-config quick start, Makefile command catalog, trade-off rationales, cURL examples, test coverage matrices, and audit trail references.
+
+### 3. Verification Gate Record
+- **Docker Compose Image Build:** `docker compose build` completed cleanly, building `calculator-backend:latest` and `calculator-frontend:latest`.
+- **Docker Compose Live Smoke Test:** `./scripts/smoke-test.sh` executed against running container stack, passing all 4 smoke tests (backend health, frontend HTTP 200, reverse-proxy 0.1 + 0.2 = 0.3 calculation, and 422 division-by-zero error).
+- **Clean Container Teardown:** `docker compose down` stopped and removed all containers and networks.
+- **Working Tree:** Pristine git state on branch `main`.
