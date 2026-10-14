@@ -72,7 +72,7 @@ describe('calculatorApi', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('throws CalculatorApiError on backend error response', async () => {
+    it('throws CalculatorApiError on backend error response with JSON body', async () => {
       const mockErrorResponse = {
         error: {
           code: 'ERR_DIVISION_BY_ZERO',
@@ -105,6 +105,90 @@ describe('calculatorApi', () => {
         expect(apiErr.code).toBe('ERR_DIVISION_BY_ZERO');
         expect(apiErr.message).toBe('Division by zero is undefined.');
         expect(apiErr.details).toBe('operand_b was 0');
+      }
+    });
+
+    it('throws generic HTTP error when non-200 response body is not JSON', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => {
+          throw new Error('Not JSON');
+        },
+      } as unknown as Response);
+
+      try {
+        await calculate({ operation: 'add', operand_a: '1', operand_b: '1' });
+        expect.unreachable('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(CalculatorApiError);
+        const apiErr = err as CalculatorApiError;
+        expect(apiErr.status).toBe(500);
+        expect(apiErr.code).toBe('ERR_HTTP_500');
+        expect(apiErr.message).toBe('Internal Server Error');
+      }
+    });
+
+    it('throws generic HTTP error with fallback message when statusText is empty', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: '',
+        json: async () => {
+          throw new Error('Not JSON');
+        },
+      } as unknown as Response);
+
+      try {
+        await calculate({ operation: 'add', operand_a: '1', operand_b: '1' });
+        expect.unreachable('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(CalculatorApiError);
+        const apiErr = err as CalculatorApiError;
+        expect(apiErr.status).toBe(502);
+        expect(apiErr.code).toBe('ERR_HTTP_502');
+        expect(apiErr.message).toBe('An unexpected HTTP error occurred.');
+      }
+    });
+
+    it('throws ERR_ABORTED when caller signal is already aborted', async () => {
+      const abortController = new AbortController();
+      abortController.abort();
+
+      try {
+        await calculate(
+          { operation: 'add', operand_a: '1', operand_b: '2' },
+          abortController.signal
+        );
+        expect.unreachable('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(CalculatorApiError);
+        const apiErr = err as CalculatorApiError;
+        expect(apiErr.status).toBe(499);
+        expect(apiErr.code).toBe('ERR_ABORTED');
+      }
+    });
+
+    it('throws ERR_ABORTED when caller signal aborts during fetch', async () => {
+      const abortController = new AbortController();
+
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        abortController.abort();
+        throw new DOMException('The user aborted a request.', 'AbortError');
+      });
+
+      try {
+        await calculate(
+          { operation: 'add', operand_a: '1', operand_b: '2' },
+          abortController.signal
+        );
+        expect.unreachable('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(CalculatorApiError);
+        const apiErr = err as CalculatorApiError;
+        expect(apiErr.status).toBe(499);
+        expect(apiErr.code).toBe('ERR_ABORTED');
       }
     });
 
@@ -143,11 +227,18 @@ describe('calculatorApi', () => {
       expect(healthy).toBe(true);
     });
 
-    it('returns false on error or non-healthy status', async () => {
+    it('returns false on non-200 response', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
       } as unknown as Response);
+
+      const healthy = await checkHealth();
+      expect(healthy).toBe(false);
+    });
+
+    it('returns false on fetch exception', async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
 
       const healthy = await checkHealth();
       expect(healthy).toBe(false);

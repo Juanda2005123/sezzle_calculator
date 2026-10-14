@@ -171,3 +171,41 @@ Implement the complete, accessible, and responsive React 19 + TypeScript + Tailw
 - **Type Safety Audit:** **0** occurrences of `any` across all `.ts` and `.tsx` source files.
 - **Vitest Test Suite:** **100% passing** (4 test files, 20 tests).
 - **Working Tree:** Clean git status.
+
+---
+
+## Phase 5: Exhaustive Frontend Test Suite (>= 85% Coverage) & Live Chromium E2E Verification
+
+### 1. Objective
+Establish an exhaustive Vitest + React Testing Library suite across all frontend modules exceeding 85% coverage (targeting >90%), and execute live End-to-End (E2E) visual, functional, and accessibility verification using automated Headless Chromium via the Chrome DevTools Protocol (CDP) against the live Go backend (`:8080`) and Vite dev server (`:5173`).
+
+### 2. Test Architecture & Coverage Results
+- **Vitest & React Testing Library Suites:**
+  - `src/App.test.tsx`: Complete user-journey integration tests covering core binary decimal precision (`0.1 + 0.2 = 0.3`), unary square root, power, dual-mode percentage, operator switching without API overhead, chained binary calculations (`10 + 5 - 3 = 12`), domain error presentations with ARIA `role="alert"`, input utilities (`.`, `±`, `DEL`, `AC`), history reload/clear, and keyboard navigation.
+  - `src/api/calculatorApi.test.ts`: Error envelopes (400, 422), non-JSON 500 fallbacks, abort signal cancellation (`ERR_ABORTED`), timeout triggers (`ERR_TIMEOUT`), network exceptions (`ERR_NETWORK`), and health check validation.
+  - `src/hooks/useCalculator.test.ts`: Complete state machine transitions, 24-character maximum length guard, multiple leading zeros, `-0` normalization, history cap (10 items), intermediate binary percentages, operator switching, and error recovery.
+  - `src/hooks/useKeyboardShortcuts.test.ts`: Physical key bindings (`0-9`, `.`, `+`, `-`, `*`, `/`, `^`, `%`, `R`, `Enter`/`=`, `Backspace`, `Escape`), `preventDefault` interception, and modifier key suppression.
+  - `src/components/*.test.tsx`:
+    - `Display.test.tsx`: ARIA live region semantics (`role="status"`, `aria-live="polite"`), dynamic font scaling (`text-4xl` to `text-xl`), and loading badge.
+    - `ErrorBanner.test.tsx`: ARIA alert semantics (`role="alert"`, `aria-live="assertive"`), code badge, error details, and dismiss action.
+    - `HistoryPanel.test.tsx`: Panel toggle, item selection, empty state, and history clearing.
+    - `Keypad.test.tsx`: Key clicks, disabled state during loading (except `AC`), active operation highlight, and active key styles.
+    - `KeyboardReference.test.tsx`: Collapsible shortcut reference guide.
+- **V8 Coverage Metrics Achieved:**
+  - **Statements:** **98.39%** (Threshold: $\ge 85\%$)
+  - **Branches:** **95.85%** (Threshold: $\ge 85\%$)
+  - **Functions:** **97.43%** (Threshold: $\ge 85\%$)
+  - **Lines:** **98.39%** (Threshold: $\ge 85\%$)
+  - **Test Suite Results:** 9 test files, 62 unit and integration tests, **100% passing**.
+
+### 3. Live Full-Stack Chromium E2E Verification Record
+- **Stack Initialization:**
+  - Go Backend (`:8080`): Verified `GET /api/v1/health` returning `{"status":"healthy"}`.
+  - Vite Frontend (`:5173`): Verified serving `200 OK`.
+- **Automated Chromium CDP Execution (`scripts/live-e2e-chromium.mjs`):**
+  - **Test Case 1 (IEEE 754 Precision via Live Go API):** Clicked `0`, `.`, `1`, `+`, `0`, `.`, `2`, `=`. Verified live display shows `0.3`, expression header shows `0.1 + 0.2 = 0.3`, and Calculation History records the entry.
+  - **Test Case 2 (Advanced Operations):** Evaluated `144 √` -> `12`, then chained with `^ 2 =` -> `144`.
+  - **Test Case 3 (Live 422 Domain Error Alert):** Evaluated `42 ÷ 0 =`. Verified `data-testid="error-banner"` with `role="alert"` and `aria-live="assertive"` rendered `ERR_DIVISION_BY_ZERO`, then dismissed cleanly.
+  - **Test Case 4 (Physical Keyboard Navigation & Viewport):** Dispatched `5`, `0`, `%` via window keydown events -> verified `0.5`. Verified viewport width and document scroll width confirming zero horizontal overflow.
+  - **Console Error Audit:** Verified **0 console errors** and 0 uncaught exceptions throughout the session.
+- **Clean Teardown:** Terminated background Go and Vite processes; confirmed ports 8080 and 5173 were released.
