@@ -125,3 +125,49 @@ Implement the production-ready HTTP transport layer in `backend/internal/transpo
   - `internal/apperror`: **100.0%** (Threshold: $\ge 90\%$).
   - Total Backend: **90.4%** (Threshold: $\ge 90\%$).
 - **Clean Compilation:** `backend/bin/calculator-api.exe` compiles cleanly.
+
+---
+
+## Phase 4: Frontend API Client, State Machine Hook & Accessible UI
+
+### 1. Objective
+Implement the complete, accessible, and responsive React 19 + TypeScript + Tailwind CSS v4 frontend layer, including shared TypeScript contracts, robust HTTP client with custom error mapping and timeout handling, deterministic state machine hook (`useCalculator`), physical keyboard navigation (`useKeyboardShortcuts`), and accessible UI components (`Display`, `ErrorBanner`, `Keypad`, `HistoryPanel`, `KeyboardReference`, `Calculator`, `App`).
+
+### 2. Frontend Architectural Specifications
+- **Shared TypeScript Contracts (`frontend/src/types/calculator.ts`):**
+  - Enforced `strict: true` with zero `any` types.
+  - Strict typing for `Operation` (`add | subtract | multiply | divide | power | sqrt | percent`).
+  - Strict request and response envelopes (`CalculateRequest`, `CalculationData`, `CalculateResponse`, `ApiErrorDetail`, `ErrorResponse`, `HistoryItem`).
+  - Canonical string operand transmission preventing client-side IEEE 754 precision loss prior to serialization.
+- **HTTP Service Client (`frontend/src/api/calculatorApi.ts`):**
+  - Custom `CalculatorApiError` preserving backend `status`, `code`, `message`, and `details`.
+  - Configurable API base URL defaulting to `import.meta.env.VITE_API_BASE_URL ?? ''` for seamless Vite dev proxying and Nginx production routing.
+  - 8-second timeout controller combined with external caller `AbortSignal`.
+  - Deterministic network failure mapping to `ERR_NETWORK` with friendly user messaging.
+  - Health check client (`checkHealth`) verifying `GET /api/v1/health`.
+- **Calculator State Machine Hook (`frontend/src/hooks/useCalculator.ts`):**
+  - Reducer-driven state management with clean single-state transitions.
+  - Input buffering: 24-character maximum length, multiple leading zero suppression (`0` -> `5`, `0` -> `0`), single decimal point guard.
+  - Immediate sign toggling (`toggleSign`) and normalized backspace (`deleteLastDigit`).
+  - Unary square root (`executeSqrt`) with immediate API invocation and history recording.
+  - Dual-mode percentage (`executePercent`): unary mode when standalone (`50% = 0.5`), binary intermediate mode when preceded by binary operator (`150 + 20% -> 30`).
+  - Chained operations (`selectOperation`): auto-evaluates pending binary operations when chaining (`10 + 5 * -> 15 *`).
+  - Operator switching without API overhead when user modifies pending operator before operand entry (`+` then `-`).
+  - Reverse chronological history retaining up to 10 entries with one-click reload.
+- **Physical Keyboard Navigation (`frontend/src/hooks/useKeyboardShortcuts.ts`):**
+  - Listens to window `keydown` events: `0-9`, `.`, `+`, `-`, `*`/`x`, `/` (with `e.preventDefault()`), `^`, `%`, `r`/`R` (sqrt), `Enter`/`=` (with `e.preventDefault()`), `Backspace`, and `Escape`.
+  - Suppresses shortcuts when modifier keys (`Ctrl`, `Alt`, `Meta`) are held while allowing `Shift` for symbol keys.
+  - Active key state tracking (150ms flash) for visual button feedback.
+- **Accessible & Responsive UI (`frontend/src/components/`, `App.tsx`):**
+  - `Display.tsx`: WAI-ARIA `role="status"` and `aria-live="polite"` with `data-testid="calculator-display"`, dynamic font scaling (4xl to xl), horizontal scroll for long decimals, and loading indicator.
+  - `ErrorBanner.tsx`: WAI-ARIA `role="alert"` and `aria-live="assertive"` with `data-testid="error-banner"`, badge with error code, message, details, and accessible dismiss button.
+  - `Keypad.tsx`: 4-column responsive grid with accessible ARIA labels, tab focus rings (`focus-visible:ring-2`), active keyboard press styling, and disabled state during API flight (preserving `AC`).
+  - `HistoryPanel.tsx`: Collapsible region with item selection and clear history action.
+  - `KeyboardReference.tsx`: Collapsible keyboard shortcut quick reference footer.
+  - `.gitkeep` placeholder files removed from `frontend/src/{api,components,hooks,types}`.
+
+### 3. Verification Gate Record
+- **TypeScript Compilation & Vite Production Bundle:** `npm run build` passed with **0 errors** and **0 warnings**.
+- **Type Safety Audit:** **0** occurrences of `any` across all `.ts` and `.tsx` source files.
+- **Vitest Test Suite:** **100% passing** (4 test files, 20 tests).
+- **Working Tree:** Clean git status.
