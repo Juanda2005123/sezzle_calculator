@@ -5,47 +5,46 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/shopspring/decimal"
+	"github.com/Juanda2005123/sezzle_calculator/backend/internal/calculator"
+	httptransport "github.com/Juanda2005123/sezzle_calculator/backend/internal/transport/http"
 )
 
-func TestCalculateDecimalSum_Valid(t *testing.T) {
+func TestNewServer(t *testing.T) {
+	engine := calculator.NewEngine()
+	router := httptransport.NewRouter(engine)
 
+	t.Run("default port 8080", func(t *testing.T) {
+		srv := NewServer("", router)
+		if srv.Addr != ":8080" {
+			t.Errorf("expected :8080, got %s", srv.Addr)
+		}
+		if srv.ReadHeaderTimeout != 5*time.Second {
+			t.Errorf("expected 5s ReadHeaderTimeout, got %v", srv.ReadHeaderTimeout)
+		}
+		if srv.ReadTimeout != 10*time.Second {
+			t.Errorf("expected 10s ReadTimeout, got %v", srv.ReadTimeout)
+		}
+		if srv.WriteTimeout != 10*time.Second {
+			t.Errorf("expected 10s WriteTimeout, got %v", srv.WriteTimeout)
+		}
+		if srv.IdleTimeout != 120*time.Second {
+			t.Errorf("expected 120s IdleTimeout, got %v", srv.IdleTimeout)
+		}
+	})
 
-
-	sum, err := CalculateDecimalSum("0.1", "0.2")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := decimal.RequireFromString("0.3")
-	if !sum.Equal(expected) {
-		t.Fatalf("expected 0.1 + 0.2 to equal 0.3, got %s", sum.String())
-	}
+	t.Run("custom port", func(t *testing.T) {
+		srv := NewServer("9090", router)
+		if srv.Addr != ":9090" {
+			t.Errorf("expected :9090, got %s", srv.Addr)
+		}
+	})
 }
 
-func TestCalculateDecimalSum_Invalid(t *testing.T) {
-	tests := []struct {
-		name string
-		a    string
-		b    string
-	}{
-		{"invalid operand a", "invalid", "0.2"},
-		{"invalid operand b", "0.1", "invalid"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := CalculateDecimalSum(tc.a, tc.b)
-			if err == nil {
-				t.Fatalf("expected error for inputs (%s, %s), got nil", tc.a, tc.b)
-			}
-		})
-	}
-}
-
-func TestHealthEndpoint(t *testing.T) {
-	router := NewRouter()
+func TestServerRouter_Health(t *testing.T) {
+	engine := calculator.NewEngine()
+	router := httptransport.NewRouter(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	rec := httptest.NewRecorder()
@@ -56,16 +55,13 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	if contentType := rec.Header().Get("Content-Type"); contentType != "application/json; charset=utf-8" {
-		t.Fatalf("expected Content-Type application/json; charset=utf-8, got %s", contentType)
+	var resp struct {
+		Status string `json:"status"`
 	}
-
-	var resp HealthResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-
 	if resp.Status != "healthy" {
-		t.Fatalf("expected status 'healthy', got '%s'", resp.Status)
+		t.Errorf("expected 'healthy', got '%s'", resp.Status)
 	}
 }

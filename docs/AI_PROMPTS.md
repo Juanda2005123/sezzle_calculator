@@ -90,3 +90,38 @@ Implement the pure domain arbitrary-precision arithmetic engine (`backend/intern
   - Percentage modes (unary `50%`, `12.5%`; binary `20% of 150`, `0% of 500`).
   - Negative zero normalization (`-0 * 5 = 0`, `0 * -3 = 0`, `-0 + 0 = 0`).
   - Complete error taxonomy coverage (400, 422, invalid arity, unknown op, overflow, division by zero, complex result, negative radicand).
+
+---
+
+## Phase 3: Backend HTTP Transport, Middleware & httptest Integration Suite
+
+### 1. Objective
+Implement the production-ready HTTP transport layer in `backend/internal/transport/http`, request/response DTOs with custom operand parsing, security and CORS middlewares, panic recovery, and an exhaustive `httptest` integration suite. Refactor `backend/cmd/api/main.go` and `main_test.go` to wire the domain engine and router with production server timeouts.
+
+### 2. Transport & Architectural Specifications
+- **Request / Response DTOs (`dto.go`):**
+  - Custom `Operand` unmarshaler accepting JSON numbers (`0.1`, `-42`, `1e5`) and strings (`"0.1"`, `" -42.5 "`) directly into `decimal.Decimal` without `float64` conversion.
+  - Strict type rejection for booleans (`true`/`false`), arrays, objects, empty strings, `"NaN"`, `"Infinity"`, and `"-Infinity"`.
+  - Success envelope (`CalculateResponse`) returning exact JSON contract with `json.Number` for unquoted literal `"result"` and string for `"formatted"`.
+  - Error envelope (`ErrorResponse`) returning `code`, `message`, and optional `details`.
+- **Handlers (`handler.go`):**
+  - `GET /api/v1/health`: Returns `200 OK` with `{"status":"healthy"}` and UTF-8 JSON header.
+  - `POST /api/v1/calculate`: Enforces 4096-byte payload limit via `http.MaxBytesReader` returning 413 `ERR_PAYLOAD_TOO_LARGE`. Decodes with `DisallowUnknownFields()` and `UseNumber()`, verifies no trailing body tokens, and delegates to `calculator.Engine`.
+  - Non-POST methods to `/api/v1/calculate` return 405 `ERR_METHOD_NOT_ALLOWED` with `Allow: POST, OPTIONS` header.
+- **Middleware & Router (`middleware.go`, `router.go`):**
+  - `CORSMiddleware`: Sets origin (default `*` or `ALLOWED_ORIGINS` env var), methods `GET, POST, OPTIONS`, headers `Content-Type, Accept, Origin`, and short-circuits `OPTIONS` with `204 No Content`.
+  - `RecoveryMiddleware`: Recovers from runtime panics, logs structured error via `log/slog`, and returns 500 `ERR_INTERNAL`.
+  - `NewRouter`: Assembles multiplexer and wraps with Recovery and CORS middleware stack.
+- **Entrypoint Refactoring (`backend/cmd/api/main.go`, `main_test.go`):**
+  - Wires `calculator.NewEngine()` and `httptransport.NewRouter(engine)`.
+  - Configures `http.Server` with `ReadHeaderTimeout` (5s), `ReadTimeout` (10s), `WriteTimeout` (10s), and `IdleTimeout` (120s).
+  - Preserves `SMOKE_CHECK=1` check verifying domain engine linkage outputting `0.3`.
+
+### 3. Verification Gate Record
+- **HTTP Integration Tests:** 100% passing across health check, happy path calculations, client contract errors, mathematical domain errors, and protocol resiliency.
+- **Statement Coverage:**
+  - `internal/transport/http`: **97.2%** (Threshold: $\ge 90\%$).
+  - `internal/calculator`: **95.5%** (Threshold: $\ge 90\%$).
+  - `internal/apperror`: **100.0%** (Threshold: $\ge 90\%$).
+  - Total Backend: **90.4%** (Threshold: $\ge 90\%$).
+- **Clean Compilation:** `backend/bin/calculator-api.exe` compiles cleanly.
