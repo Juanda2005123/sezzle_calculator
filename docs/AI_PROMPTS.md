@@ -1,254 +1,536 @@
-# AI Prompt Audit & Engineering Log
+# AI-Assisted Engineering Workflow & Complete Verbatim Prompt Audit Log
 
-## Overview & Governance
-This document maintains an immutable audit trail of the engineering instructions, architectural decisions, and verification gates throughout the lifecycle of the **Sezzle Precision Calculator** project.
+## 1. Executive Summary: Two-Tier Staff Architect ↔ Autonomous Agent Methodology
 
-The system is governed by the architectural guardrails codified in `AGENT_RULES.md` and `.cursorrules`:
-- **100% English Language Policy** across code, comments, error codes, commit messages, and docs.
-- **Arbitrary Precision Arithmetic** using `github.com/shopspring/decimal` for base-10 operations to avoid binary floating-point representation anomalies (`0.1 + 0.2 != 0.3`).
-- **Deterministic Domain Invariants** with guard precision and 16-decimal-place rounding (`MaxPrecision = 16`) for irrational/transcendental functions.
-- **Strict Error Envelope & HTTP Taxonomy** (400, 422, 405, 413) preventing unhandled 500 errors.
-- **Accessible & Strict Frontend Architecture** (React 19 + TypeScript + Vite + Tailwind CSS v4, WAI-ARIA `aria-live` status regions, keyboard navigation).
-- **Comprehensive Verification Gates** with table-driven Go tests (>90% coverage) and Vitest RTL suites (>85% coverage).
+Rather than using ad-hoc "prompt-and-pray" code generation, this project was engineered using a disciplined **Two-Tier AI Architecture**:
 
----
+1. **Tier 1 — Systems Architecture & Specification (Human Engineer ↔ Staff Architect Model):**
+   - Established architectural trade-offs (React 19 + Vite vs. Next.js, unified `POST /api/v1/calculate` vs. split endpoints, `shopspring/decimal` vs. IEEE 754 `float64`, Distroless + Nginx reverse proxy).
+   - Conducted a preemptive **Blind Spot & Gap Analysis** covering financial percentage semantics, fractional negative base exponentiation (`ERR_COMPLEX_RESULT`), exponent CPU/memory DoS bounds (`10^1000`), and JSON number deserialization traps.
+   - Calibrated prompt abstraction to enforce strict contracts, non-interactive CLI flags, and deterministic verification gates rather than copy-pasting boilerplate.
 
-## Phase 1: Repository Scaffolding, Tooling & Guardrails
-
-### 1. Objective
-Establish a rock-solid, production-grade monorepo foundation with Git configuration, directory hierarchy, engineering guardrails, root `Makefile`, and compilable backend/frontend skeletons verifying decimal precision and UI test infrastructure.
-
-### 2. Scaffold Specifications
-- **Git & Remote:** Branch `main` linked to `https://github.com/Juanda2005123/sezzle_calculator.git`.
-- **Directory Hierarchy:**
-  - `.github/workflows/`: CI/CD automation pipelines.
-  - `backend/cmd/api/`: Go entrypoint and HTTP server.
-  - `backend/internal/apperror/`: Application error taxonomy.
-  - `backend/internal/calculator/`: Pure domain arithmetic engine.
-  - `backend/internal/transport/http/`: HTTP routing and handlers.
-  - `frontend/src/{api,components,hooks,types}/`: Layered React application.
-  - `docs/`: Architecture and prompt audit logs.
-  - `scripts/`: Tooling and smoke testing scripts.
-- **Root Tooling:**
-  - `AGENT_RULES.md` & `.cursorrules`: Strict project standards.
-  - `Makefile`: Standardized lifecycle targets (`dev-*`, `test-*`, `coverage-*`, `build`, `docker-*`, `smoke-test`).
-  - `.gitignore`: Ignoring build binaries, Node modules, coverage reports, OS/IDE files.
-- **Backend Skeleton:**
-  - Go module `github.com/Juanda2005123/sezzle_calculator/backend` with `github.com/shopspring/decimal@v1.4.0`.
-  - Precision check (`0.1 + 0.2 = 0.3`) and `SMOKE_CHECK=1` CLI mode.
-  - `GET /api/v1/health` endpoint returning `{"status":"healthy"}`.
-- **Frontend Skeleton:**
-  - Vite + React 19 + TypeScript with Tailwind CSS v4.
-  - Vitest + React Testing Library + `@testing-library/jest-dom` test runner.
-  - Proxy configuration forwarding `/api` to `http://localhost:8080`.
-  - Accessible placeholder component rendering "Sezzle Precision Calculator" and verified by Vitest smoke test.
-
-### 3. Verification Gate Record
-- **Go Version:** Go 1.27.0 windows/amd64
-- **Node / npm Version:** Node v24.12.0 / npm 11.19.0
-- **Git Remote:** `origin https://github.com/Juanda2005123/sezzle_calculator.git`
-- **Decimal Smoke Check (`SMOKE_CHECK=1`):** Verified output `0.3`.
-- **Backend Binary Compilation:** `backend/bin/calculator-api` built successfully.
-- **Frontend Build & Tests:** TypeScript compilation (`tsc -b`) and Vite production build succeeded; Vitest smoke test passed (1/1 passed).
+2. **Tier 2 — Phased Autonomous Execution (Staff Architect Specs → Antigravity Implementation Agent):**
+   - Governed by persistent repository guardrails ([`AGENT_RULES.md`](../AGENT_RULES.md) / `.cursorrules`).
+   - Executed across **6 isolated phases**, where each phase required passing strict CLI build, test coverage, and E2E verification gates before committing to Git.
 
 ---
 
-## Phase 2: Backend Domain Engine & Unit Test Suite
+## 2. Tier 1: Human Engineer → Staff Architect Prompts (Verbatim)
 
-### 1. Objective
-Implement the pure domain arbitrary-precision arithmetic engine (`backend/internal/calculator`) and standardized error package (`backend/internal/apperror`) adhering to strict domain invariants, mathematical constraints, and table-driven unit test coverage exceeding 95%.
+<details>
+<summary><strong>Prompt 1.1: Initial Mission Brief, Architectural Trade-offs & Gap Analysis</strong> (Click to expand)</summary>
 
-### 2. Domain Engine & Error Specifications
-- **Domain Errors (`backend/internal/apperror`):**
-  - Standardized `AppError` struct implementing `error` with `Code`, `Message`, `Details`, and `HTTPStatus`.
-  - HTTP 400 Bad Request: `ERR_MALFORMED_JSON`, `ERR_INVALID_OPERAND`, `ERR_UNSUPPORTED_OPERATION`, `ERR_INVALID_ARITY`.
-  - HTTP 422 Unprocessable Entity: `ERR_DIVISION_BY_ZERO`, `ERR_NEGATIVE_RADICAND`, `ERR_COMPLEX_RESULT`, `ERR_NUMERIC_OVERFLOW`.
-  - HTTP 405 Method Not Allowed: `ERR_METHOD_NOT_ALLOWED`.
-  - HTTP 413 Payload Too Large: `ERR_PAYLOAD_TOO_LARGE`.
-  - HTTP 500 Internal Server Error: `ERR_INTERNAL`.
-- **Arithmetic Engine (`backend/internal/calculator`):**
-  - **Supported Operations:** `add`, `subtract`, `multiply`, `divide`, `power`, `sqrt`, `percent` (unary & binary).
-  - **Arbitrary Precision:** All base-10 operations executed via `github.com/shopspring/decimal`.
-  - **Precision & Guard Digits:** `MaxPrecision = 16` for output rounding, intermediate division at `GuardPrecision = 32`.
-  - **Magnitude Bounds:** Strict overflow enforcement rejecting numbers exceeding $|10^{1000}|$.
-  - **Square Root:** Zero and exact integer/decimal evaluation (`sqrt(144) = 12`, `sqrt(0.04) = 0.2`, `sqrt(2) = 1.4142135623730951`), negative radicand rejection (`ERR_NEGATIVE_RADICAND`), and `big.Float` high-precision fallback for huge radicands beyond `math.MaxFloat64` (`sqrt(1e400) = 1e200`).
-  - **Power:** Zero base rules, negative base fractional rejection (`ERR_COMPLEX_RESULT`), exponent magnitude check ($|b| \le 10000$), pre-computation $\log_{10}(|a|) \times b$ overflow estimation, binary exponentiation with overflow bounds, parity preservation for large odd/even integer exponents (`(-1)^99999 = -1`).
-  - **Percentage Modes:** Unary (`a / 100`) and binary (`(a * b) / 100`).
-  - **Canonical Normalization:** `-0` normalized to `"0"`, trailing zeros stripped on `Formatted` and `Expression`.
+~~~markdown
+# MISSION BRIEF: SENIOR FULL-STACK ARCHITECTURAL DESIGN & SPECIFICATION
 
-### 3. Verification Gate Record
-- **Unit Test Execution:** 100% passing across `internal/apperror` and `internal/calculator`.
-- **Statement Coverage:**
-  - `internal/apperror`: **100.0%**
-  - `internal/calculator`: **95.5%**
-- **Table-Driven Test Suites:**
-  - Standard arithmetic (positive, negative, zero across all operations).
-  - IEEE 754 precision traps (`0.1 + 0.2 = 0.3`, `0.3 - 0.1 = 0.2`, `0.1 * 0.2 = 0.02`, `1.005 * 100 = 100.5`, `0.1 + 0.7 = 0.8`).
-  - Repeating and irrational decimals (`1/3`, `2/3`, `sqrt(2)`, `sqrt(0.04)`, `2^0.5`).
-  - High-magnitude square root (`sqrt(1e400) = 1e200`).
-  - Exponentiation edge cases (`0^0 = 1`, `0^5 = 0`, `5^0 = 1`, `2^-3 = 0.125`, `(-2)^3 = -8`, `(-2)^4 = 16`, `(-1)^99999 = -1`, `(-1)^1000 = 1`, `1^500 = 1`).
-  - Percentage modes (unary `50%`, `12.5%`; binary `20% of 150`, `0% of 500`).
-  - Negative zero normalization (`-0 * 5 = 0`, `0 * -3 = 0`, `-0 + 0 = 0`).
-  - Complete error taxonomy coverage (400, 422, invalid arity, unknown op, overflow, division by zero, complex result, negative radicand).
+## LANGUAGE POLICY & MANDATORY DIRECTIVE
+All code, comments, documentation, commit messages, API specifications, prompts, and architectural discussions throughout this entire project MUST be exclusively in English. No exceptions.
 
 ---
 
-## Phase 3: Backend HTTP Transport, Middleware & httptest Integration Suite
+## 1. CONTEXT & OFFICIAL ASSESSMENT REQUIREMENTS
 
-### 1. Objective
-Implement the production-ready HTTP transport layer in `backend/internal/transport/http`, request/response DTOs with custom operand parsing, security and CORS middlewares, panic recovery, and an exhaustive `httptest` integration suite. Refactor `backend/cmd/api/main.go` and `main_test.go` to wire the domain engine and router with production server timeouts.
+I have been invited to complete a technical take-home assessment for Sezzle. The recommended time investment is **~2–4 hours**, prioritizing correctness, clarity, maintainability, and robust architecture over excessive feature bloat.
 
-### 2. Transport & Architectural Specifications
-- **Request / Response DTOs (`dto.go`):**
-  - Custom `Operand` unmarshaler accepting JSON numbers (`0.1`, `-42`, `1e5`) and strings (`"0.1"`, `" -42.5 "`) directly into `decimal.Decimal` without `float64` conversion.
-  - Strict type rejection for booleans (`true`/`false`), arrays, objects, empty strings, `"NaN"`, `"Infinity"`, and `"-Infinity"`.
-  - Success envelope (`CalculateResponse`) returning exact JSON contract with `json.Number` for unquoted literal `"result"` and string for `"formatted"`.
-  - Error envelope (`ErrorResponse`) returning `code`, `message`, and optional `details`.
-- **Handlers (`handler.go`):**
-  - `GET /api/v1/health`: Returns `200 OK` with `{"status":"healthy"}` and UTF-8 JSON header.
-  - `POST /api/v1/calculate`: Enforces 4096-byte payload limit via `http.MaxBytesReader` returning 413 `ERR_PAYLOAD_TOO_LARGE`. Decodes with `DisallowUnknownFields()` and `UseNumber()`, verifies no trailing body tokens, and delegates to `calculator.Engine`.
-  - Non-POST methods to `/api/v1/calculate` return 405 `ERR_METHOD_NOT_ALLOWED` with `Allow: POST, OPTIONS` header.
-- **Middleware & Router (`middleware.go`, `router.go`):**
-  - `CORSMiddleware`: Sets origin (default `*` or `ALLOWED_ORIGINS` env var), methods `GET, POST, OPTIONS`, headers `Content-Type, Accept, Origin`, and short-circuits `OPTIONS` with `204 No Content`.
-  - `RecoveryMiddleware`: Recovers from runtime panics, logs structured error via `log/slog`, and returns 500 `ERR_INTERNAL`.
-  - `NewRouter`: Assembles multiplexer and wraps with Recovery and CORS middleware stack.
-- **Entrypoint Refactoring (`backend/cmd/api/main.go`, `main_test.go`):**
-  - Wires `calculator.NewEngine()` and `httptransport.NewRouter(engine)`.
-  - Configures `http.Server` with `ReadHeaderTimeout` (5s), `ReadTimeout` (10s), `WriteTimeout` (10s), and `IdleTimeout` (120s).
-  - Preserves `SMOKE_CHECK=1` check verifying domain engine linkage outputting `0.3`.
+My objective is to produce a production-grade, full-stack calculator application that showcases senior-level engineering discipline, clean code, comprehensive testing, and a transparent, professional AI-assisted workflow.
 
-### 3. Verification Gate Record
-- **HTTP Integration Tests:** 100% passing across health check, happy path calculations, client contract errors, mathematical domain errors, and protocol resiliency.
-- **Statement Coverage:**
-  - `internal/transport/http`: **97.2%** (Threshold: $\ge 90\%$).
-  - `internal/calculator`: **95.5%** (Threshold: $\ge 90\%$).
-  - `internal/apperror`: **100.0%** (Threshold: $\ge 90\%$).
-  - Total Backend: **90.4%** (Threshold: $\ge 90\%$).
-- **Clean Compilation:** `backend/bin/calculator-api.exe` compiles cleanly.
+### Functional Requirements
+- **Core Operations (Required):** Addition (+), Subtraction (-), Multiplication (*), Division (/).
+- **Advanced Operations (Confirmed Scope):** Exponentiation (^), Square Root (√), and Percentage (%).
+- **Frontend (React):**
+  - Intuitive, responsive UI for input entry and result display (including basic mobile support).
+  - Robust client-side validation and graceful error state presentation.
+- **Backend (REST API):**
+  - Exposed HTTP endpoints for calculator operations.
+  - Strict input validation and edge-case handling (division by zero, malformed payloads, invalid data types, domain errors like negative square roots).
+  - Consistent JSON response structures.
 
----
+### Non-Functional Requirements
+- Clean, readable, and idiomatic code across both frontend and backend.
+- High test coverage with meaningful test cases across critical paths.
+- Comprehensive documentation: setup guides, API consumption examples, and architectural rationale.
+- Containerization: Full-stack execution via Docker / Docker Compose.
 
-## Phase 4: Frontend API Client, State Machine Hook & Accessible UI
+### Technical Constraints
+- **Frontend:** React (TypeScript strongly preferred).
+- **Backend:** Go (Golang) is the preferred language.
 
-### 1. Objective
-Implement the complete, accessible, and responsive React 19 + TypeScript + Tailwind CSS v4 frontend layer, including shared TypeScript contracts, robust HTTP client with custom error mapping and timeout handling, deterministic state machine hook (`useCalculator`), physical keyboard navigation (`useKeyboardShortcuts`), and accessible UI components (`Display`, `ErrorBanner`, `Keypad`, `HistoryPanel`, `KeyboardReference`, `Calculator`, `App`).
-
-### 2. Frontend Architectural Specifications
-- **Shared TypeScript Contracts (`frontend/src/types/calculator.ts`):**
-  - Enforced `strict: true` with zero `any` types.
-  - Strict typing for `Operation` (`add | subtract | multiply | divide | power | sqrt | percent`).
-  - Strict request and response envelopes (`CalculateRequest`, `CalculationData`, `CalculateResponse`, `ApiErrorDetail`, `ErrorResponse`, `HistoryItem`).
-  - Canonical string operand transmission preventing client-side IEEE 754 precision loss prior to serialization.
-- **HTTP Service Client (`frontend/src/api/calculatorApi.ts`):**
-  - Custom `CalculatorApiError` preserving backend `status`, `code`, `message`, and `details`.
-  - Configurable API base URL defaulting to `import.meta.env.VITE_API_BASE_URL ?? ''` for seamless Vite dev proxying and Nginx production routing.
-  - 8-second timeout controller combined with external caller `AbortSignal`.
-  - Deterministic network failure mapping to `ERR_NETWORK` with friendly user messaging.
-  - Health check client (`checkHealth`) verifying `GET /api/v1/health`.
-- **Calculator State Machine Hook (`frontend/src/hooks/useCalculator.ts`):**
-  - Reducer-driven state management with clean single-state transitions.
-  - Input buffering: 24-character maximum length, multiple leading zero suppression (`0` -> `5`, `0` -> `0`), single decimal point guard.
-  - Immediate sign toggling (`toggleSign`) and normalized backspace (`deleteLastDigit`).
-  - Unary square root (`executeSqrt`) with immediate API invocation and history recording.
-  - Dual-mode percentage (`executePercent`): unary mode when standalone (`50% = 0.5`), binary intermediate mode when preceded by binary operator (`150 + 20% -> 30`).
-  - Chained operations (`selectOperation`): auto-evaluates pending binary operations when chaining (`10 + 5 * -> 15 *`).
-  - Operator switching without API overhead when user modifies pending operator before operand entry (`+` then `-`).
-  - Reverse chronological history retaining up to 10 entries with one-click reload.
-- **Physical Keyboard Navigation (`frontend/src/hooks/useKeyboardShortcuts.ts`):**
-  - Listens to window `keydown` events: `0-9`, `.`, `+`, `-`, `*`/`x`, `/` (with `e.preventDefault()`), `^`, `%`, `r`/`R` (sqrt), `Enter`/`=` (with `e.preventDefault()`), `Backspace`, and `Escape`.
-  - Suppresses shortcuts when modifier keys (`Ctrl`, `Alt`, `Meta`) are held while allowing `Shift` for symbol keys.
-  - Active key state tracking (150ms flash) for visual button feedback.
-- **Accessible & Responsive UI (`frontend/src/components/`, `App.tsx`):**
-  - `Display.tsx`: WAI-ARIA `role="status"` and `aria-live="polite"` with `data-testid="calculator-display"`, dynamic font scaling (4xl to xl), horizontal scroll for long decimals, and loading indicator.
-  - `ErrorBanner.tsx`: WAI-ARIA `role="alert"` and `aria-live="assertive"` with `data-testid="error-banner"`, badge with error code, message, details, and accessible dismiss button.
-  - `Keypad.tsx`: 4-column responsive grid with accessible ARIA labels, tab focus rings (`focus-visible:ring-2`), active keyboard press styling, and disabled state during API flight (preserving `AC`).
-  - `HistoryPanel.tsx`: Collapsible region with item selection and clear history action.
-  - `KeyboardReference.tsx`: Collapsible keyboard shortcut quick reference footer.
-  - `.gitkeep` placeholder files removed from `frontend/src/{api,components,hooks,types}`.
-
-### 3. Verification Gate Record
-- **TypeScript Compilation & Vite Production Bundle:** `npm run build` passed with **0 errors** and **0 warnings**.
-- **Type Safety Audit:** **0** occurrences of `any` across all `.ts` and `.tsx` source files.
-- **Vitest Test Suite:** **100% passing** (4 test files, 20 tests).
-- **Working Tree:** Clean git status.
+### Mandatory Deliverables
+1. Git repository containing decoupled frontend and backend codebases.
+2. Production-grade `README.md` containing:
+   - Setup and execution instructions (local standalone and via Docker).
+   - Concrete API usage examples (cURL requests and JSON response bodies).
+   - Architectural decisions, assumptions, and trade-off rationales.
+3. Unit test suites with measurable code coverage reports.
+4. Working `Dockerfile` and `docker-compose.yml` for unified full-stack startup.
+5. **AI Workflow Transparency:** An audit log of all prompts used throughout the implementation.
 
 ---
 
-## Phase 5: Exhaustive Frontend Test Suite (>= 85% Coverage) & Live Chromium E2E Verification
+## 2. ENGINEERING DILEMMAS & ARCHITECTURAL TRADEOFFS TO RESOLVE
 
-### 1. Objective
-Establish an exhaustive Vitest + React Testing Library suite across all frontend modules exceeding 85% coverage (targeting >90%), and execute live End-to-End (E2E) visual, functional, and accessibility verification using automated Headless Chromium via the Chrome DevTools Protocol (CDP) against the live Go backend (`:8080`) and Vite dev server (`:5173`).
+Act as a **Staff Software Engineer & Systems Architect**. Analyze and establish a clear, justified stance on each of the following engineering areas:
 
-### 2. Test Architecture & Coverage Results
-- **Vitest & React Testing Library Suites:**
-  - `src/App.test.tsx`: Complete user-journey integration tests covering core binary decimal precision (`0.1 + 0.2 = 0.3`), unary square root, power, dual-mode percentage, operator switching without API overhead, chained binary calculations (`10 + 5 - 3 = 12`), domain error presentations with ARIA `role="alert"`, input utilities (`.`, `±`, `DEL`, `AC`), history reload/clear, and keyboard navigation.
-  - `src/api/calculatorApi.test.ts`: Error envelopes (400, 422), non-JSON 500 fallbacks, abort signal cancellation (`ERR_ABORTED`), timeout triggers (`ERR_TIMEOUT`), network exceptions (`ERR_NETWORK`), and health check validation.
-  - `src/hooks/useCalculator.test.ts`: Complete state machine transitions, 24-character maximum length guard, multiple leading zeros, `-0` normalization, history cap (10 items), intermediate binary percentages, operator switching, and error recovery.
-  - `src/hooks/useKeyboardShortcuts.test.ts`: Physical key bindings (`0-9`, `.`, `+`, `-`, `*`, `/`, `^`, `%`, `R`, `Enter`/`=`, `Backspace`, `Escape`), `preventDefault` interception, and modifier key suppression.
-  - `src/components/*.test.tsx`:
-    - `Display.test.tsx`: ARIA live region semantics (`role="status"`, `aria-live="polite"`), dynamic font scaling (`text-4xl` to `text-xl`), and loading badge.
-    - `ErrorBanner.test.tsx`: ARIA alert semantics (`role="alert"`, `aria-live="assertive"`), code badge, error details, and dismiss action.
-    - `HistoryPanel.test.tsx`: Panel toggle, item selection, empty state, and history clearing.
-    - `Keypad.test.tsx`: Key clicks, disabled state during loading (except `AC`), active operation highlight, and active key styles.
-    - `KeyboardReference.test.tsx`: Collapsible shortcut reference guide.
-- **V8 Coverage Metrics Achieved:**
-  - **Statements:** **98.39%** (Threshold: $\ge 85\%$)
-  - **Branches:** **95.85%** (Threshold: $\ge 85\%$)
-  - **Functions:** **97.43%** (Threshold: $\ge 85\%$)
-  - **Lines:** **98.39%** (Threshold: $\ge 85\%$)
-  - **Test Suite Results:** 9 test files, 62 unit and integration tests, **100% passing**.
+### A. Frontend: Stack & Architecture
+- **Tooling Evaluation:** Evaluate React + Vite + TypeScript vs. Next.js. Compare them in the context of an SPA client consuming a separate microservice, operational overhead, build velocity, and avoidance of unnecessary complexity (overkill).
+- **State & UI Separation:** Propose a clean architecture on the client side separating UI presentation, state machines/hooks, and HTTP service communication.
+- **Styling Solution:** Recommend an approach (e.g., Tailwind CSS, CSS Modules) that delivers an accessible, responsive, modern interface without boilerplate drag.
 
-### 3. Live Full-Stack Chromium E2E Verification Record
-- **Stack Initialization:**
-  - Go Backend (`:8080`): Verified `GET /api/v1/health` returning `{"status":"healthy"}`.
-  - Vite Frontend (`:5173`): Verified serving `200 OK`.
-- **Automated Chromium CDP Execution (`scripts/live-e2e-chromium.mjs`):**
-  - **Test Case 1 (IEEE 754 Precision via Live Go API):** Clicked `0`, `.`, `1`, `+`, `0`, `.`, `2`, `=`. Verified live display shows `0.3`, expression header shows `0.1 + 0.2 = 0.3`, and Calculation History records the entry.
-  - **Test Case 2 (Advanced Operations):** Evaluated `144 √` -> `12`, then chained with `^ 2 =` -> `144`.
-  - **Test Case 3 (Live 422 Domain Error Alert):** Evaluated `42 ÷ 0 =`. Verified `data-testid="error-banner"` with `role="alert"` and `aria-live="assertive"` rendered `ERR_DIVISION_BY_ZERO`, then dismissed cleanly.
-  - **Test Case 4 (Physical Keyboard Navigation & Viewport):** Dispatched `5`, `0`, `%` via window keydown events -> verified `0.5`. Verified viewport width and document scroll width confirming zero horizontal overflow.
-  - **Console Error Audit:** Verified **0 console errors** and 0 uncaught exceptions throughout the session.
-- **Clean Teardown:** Terminated background Go and Vite processes; confirmed ports 8080 and 5173 were released.
+### B. Backend: Architecture & REST API Design (Go)
+- **API Contract Design:**
+  - Evaluate the trade-offs between:
+    1. A unified calculation endpoint (e.g., `POST /api/v1/calculate` with `{ operation, a, b }`).
+    2. Operation-specific semantic REST endpoints (e.g., `POST /api/v1/calculate/add`, `POST /api/v1/calculate/sqrt`, etc.).
+  - Which approach better handles arity variations (binary operations like addition vs. unary operations like square root) while maintaining clean schema validation?
+- **OpenAPI / Swagger:**
+  - Assess whether embedding an OpenAPI/Swagger UI spec adds tangible reviewer value or constitutes unnecessary overhead for a 2–4 hour assessment versus clear markdown contracts in the README.
+- **Backend Layering (Clean/Hexagonal Architecture without Dogma):**
+  - Define an idiomatic Go package structure (e.g., `cmd/`, `internal/domain`, `internal/service`, `internal/handler`) that enforces separation of concerns and high testability without over-abstracting through dozens of trivial boilerplate interfaces.
+- **Arithmetic Precision & IEEE 754 Pitfalls:**
+  - How should floating-point inaccuracies (e.g., `0.1 + 0.2 = 0.30000000000000004`) and large number overflows be addressed in Go and serialized to JSON? Evaluate native `float64` vs. arbitrary-precision packages (e.g., `shopspring/decimal` or `math/big`).
+
+### C. Testing Strategy: Unit, Integration, & End-to-End (E2E)
+- **Unit Testing:**
+  - Backend: Table-driven tests in Go covering standard operations, precision limits, boundary values, and deliberate error injections.
+  - Frontend: Component and hook testing via Vitest and React Testing Library.
+- **Integration & End-to-End (E2E) Evaluation:**
+  - Given that frontend and backend operate as decoupled services, rigorously evaluate whether implementing End-to-End tests (e.g., Playwright/Cypress) or contract integration tests is justified within the 2–4 hour window.
+  - If E2E is considered high-value, how can it be implemented minimally without introducing flaky browser setup dependencies into the reviewer's evaluation pipeline? If skipped or mocked, how do you justify the boundary?
+
+### D. Containerization & Developer Experience (DX)
+- Design multi-stage Dockerfiles (optimizing image sizes with Alpine/Distroless for Go and Nginx for React) and a single `docker-compose.yml` ensuring any evaluator can clone the repository and run `docker compose up --build` with zero local configuration.
+
+### E. AI-Assisted Methodology, Skills & Prompt Auditing
+- The prompt transparency requirement must demonstrate engineering rigor, not random prompt-and-pray iterations.
+- **Skills vs. Modular Prompts:**
+  - Evaluate the utility of incorporating predefined coding skills/rules (e.g., patterns inspired by `mattpocock/skills` or specialized system guidelines for Go idiomatic patterns and strict TypeScript) versus maintaining tightly scoped, contextual prompts per feature phase.
+  - Where is the line between disciplined AI prompting and excessive process overhead?
+- **Prompt Logging Strategy:**
+  - Propose an organized structure for the prompt audit log (e.g., `docs/AI_PROMPTS.md`) documenting intent, input context, refinement steps, and quality control reviews.
+
+### F. Comprehensive Gap Analysis & Blind Spot Investigation
+- Conduct an exhaustive investigation into potential blind spots, edge cases, and hidden pitfalls that have not been explicitly covered in this prompt.
+- Identify critical considerations regarding:
+  - CORS configuration and pre-flight handling between frontend and backend.
+  - Resiliency and error propagation (ensuring no `500 Internal Server Error` escapes for client-induced arithmetic or validation failures).
+  - Input parsing sanitization (handling JSON payloads with string-encoded numbers, null values, trailing decimals, scientific notation, division by zero, negative radicands).
+  - Continuous Integration (CI) readiness (e.g., GitHub Actions running linting, tests, and coverage checks on push).
+  - Accessibility (ARIA labels, keyboard navigation for the calculator keypad).
+~~~
+
+**Architectural Outcome:** Established the complete system blueprint, selected Go 1.22+ (`shopspring/decimal`) + React 19 (Vite + TypeScript + Tailwind v4), defined the unified `POST /api/v1/calculate` schema with dual numeric/formatted string output, and designed the 400 vs. 422 error taxonomy.
+</details>
+
+<details>
+<summary><strong>Prompt 1.2: Transition to Phased Execution Pipeline & Model Asymmetry Strategy</strong> (Click to expand)</summary>
+
+~~~markdown
+I have reviewed and fully approved your architectural blueprint, API specifications, and gap analysis mitigations. The precision choices and edge-case definitions align with the standard of engineering we want to present.
+
+We are now ready to transition into the phased execution pipeline.
+
+### 1. EXECUTION CONTEXT & MODEL ASYMMETRY
+- **Target Repository:** `https://github.com/Juanda2005123/sezzle_calculator.git`
+- **Execution Agent:** Development will be conducted inside **Antigravity**, an autonomous agent environment with shell access, filesystem control, and build toolchains.
+- **Model Capability Delta:** The agent in Antigravity runs on **Gemini Flash**, whereas you (Gemini Argon) act as the **Staff Architect & Reasoning Engine**. While the domain logic of a calculator is straightforward, Gemini Flash requires **unambiguous, highly prescriptive, and deterministic prompts** to prevent subtle drift, missing edge cases, or loose typing.
+- **Your Role:** You must provide crystal-clear, exhaustive instructions for each phase—including exact terminal commands, directory paths, dependency versions, and non-negotiable code contracts. Flash should never have to guess architectural decisions or mathematical semantics.
+
+### 2. WORKFLOW & FEEDBACK LOOP
+We will follow a strict **Staff Architect (You) ↔ Autonomous Implementer (Antigravity/Flash)** loop:
+1. **You** deliver the complete, self-contained implementation prompt for the current phase.
+2. **Antigravity (Flash)** executes the instructions, creates the files, and runs terminal verification commands.
+3. **I** return the build outputs, test results, and file tree back to you for audit.
+4. **You** review the implementation, catch any discrepancies against our architectural blueprint, and once approved, output the prompt for the next phase.
+
+### 3. YOUR IMMEDIATE DELIVERABLES
+#### A. Phasing & Agent Guidance Assessment
+- Confirm whether your proposed 5–6 phase roadmap is optimal for an autonomous coding agent, or adjust phase boundaries to maximize testability and focus.
+- **Agent Rules & Skills:** Decide whether Antigravity should rely on a comprehensive system rule file (e.g., `.cursorrules` / `AGENT_RULES.md`) or dedicated skill definitions.
+#### B. Phase 1 Implementation Prompt (For Antigravity / Gemini Flash)
+Generate the complete, ready-to-run prompt for **Phase 1: Repository Scaffolding, Git Remote, and Project Skeletons**.
+~~~
+
+**Architectural Outcome:** Established the 6-phase verification-gated execution roadmap and persistent root `AGENT_RULES.md` / `.cursorrules` guardrails.
+</details>
+
+<details>
+<summary><strong>Prompt 1.3: Prompt Abstraction Calibration (Specifications Over Boilerplate Micromanagement)</strong> (Click to expand)</summary>
+
+~~~markdown
+Thank you for the structured assessment and breakdown. The 6-phase roadmap and the explicit CLI verification gates are solid.
+
+However, we need to calibrate the level of abstraction in the implementation prompts for Antigravity:
+
+### Feedback & Adjustments:
+1. **Avoid Boilerplate Micromanagement:** Do not write out entire source files (such as `package.json`, `App.tsx`, `main.go`, or `tsconfig.json`) line-by-line inside the prompt. Antigravity is an autonomous coding agent with full shell and filesystem capabilities. Treating it like a copy-paste script wastes prompt context and diminishes its agentic strengths.
+2. **True Architect Stance:** Your role as Staff Architect is to provide **prescriptive specifications, structural constraints, and acceptance criteria**—not the boilerplate code itself. The prompt should specify:
+   - Target tools and exact package versions (e.g., `github.com/shopspring/decimal v1.4`, Tailwind CSS v4, Vitest, `@testing-library/react`).
+   - The required directory layout and module paths.
+   - Non-interactive CLI commands (e.g., `npm create vite@latest frontend -- --template react-ts` instead of interactive wizards).
+   - Architectural guardrails (English only, no `any`, no `float64` in domain math, RFC 9457 error payloads).
+   - The mandatory CLI verification commands and output metrics the agent must run and report back.
+3. **Delegation:** Let the agent scaffold the files, wire up the dependencies, and write the initial code according to your specifications. If the agent deviates from your criteria, we will catch and correct it at the verification gate.
+
+Please regenerate the **Phase 1 Execution Prompt** under this calibrated format: concise, highly prescriptive on rules, standards, commands, and verification criteria, but allowing Antigravity to generate the actual boilerplate code.
+~~~
+
+**Architectural Outcome:** Calibrated all 6 phase prompts to provide strict behavioral/mathematical contracts, input/output invariants, and mandatory CLI verification gates while delegating code synthesis to the autonomous agent.
+</details>
 
 ---
 
-## Phase 6: Containerization, Smoke Testing, CI, OpenAPI & Production README
+## 3. Tier 2: Staff Architect → Antigravity Phased Execution Prompts (Verbatim)
 
-### 1. Objective
-Deliver production-grade infrastructure, containerization, and comprehensive project documentation. This comprises multi-stage Dockerfiles for Go backend and React frontend, Nginx reverse-proxy configuration, unified Docker Compose orchestration with healthchecks, an automated smoke testing script, GitHub Actions CI workflow, OpenAPI 3.1 specification, and a complete architectural README.
+<details>
+<summary><strong>Phase 1 Prompt: Repository Scaffolding, Tooling & Guardrails</strong> (Click to expand)</summary>
 
-### 2. Infrastructure & Delivery Specifications
-- **Backend Containerization (`backend/Dockerfile`):**
-  - Multi-stage build using `golang:1.24-alpine` compiling static binaries with `-ldflags="-s -w"`.
-  - Minimal runtime using `gcr.io/distroless/static-debian12:nonroot` running as `nonroot:nonroot` on port 8080.
-  - Built-in static healthcheck binary (`/bin/healthcheck`) compiled from `cmd/healthcheck/main.go` enabling zero-shell health checking inside distroless.
-- **Frontend Containerization (`frontend/Dockerfile` & `frontend/nginx.conf`):**
-  - Multi-stage build using `node:22-alpine` (`npm ci` and `npm run build`).
-  - Runtime using `nginx:1.27-alpine` serving the compiled static bundle on port 80.
-  - Nginx configuration with `/api/` reverse proxy to `http://backend:8080/api/` enabling same-origin communication without CORS overhead in containerized mode.
-  - SPA fallback (`try_files $uri $uri/ /index.html`) and static asset cache headers.
-- **Unified Orchestration (`docker-compose.yml`):**
-  - `backend` service exposing port `8080:8080` with native healthcheck hitting `/api/v1/health`.
-  - `frontend` service exposing port `3000:80` depending on `backend` with `condition: service_healthy`, preventing startup race conditions.
-- **Automated Smoke Testing (`scripts/smoke-test.sh`):**
-  - Polls backend `/api/v1/health` until healthy (up to 30s).
-  - Validates frontend availability on port 3000 (HTTP 200).
-  - Verifies decimal precision addition (`0.1 + 0.2 = 0.3`) through Nginx frontend proxy.
-  - Verifies division-by-zero error handling (HTTP 422 with `ERR_DIVISION_BY_ZERO`).
-  - Explicit exit codes (`exit 0` on success, `exit 1` on failure).
-- **GitHub Actions CI Workflow (`.github/workflows/ci.yml`):**
-  - Multi-job pipeline executing on `push` and `pull_request` to `main`:
-    1. Backend: Go 1.24 setup, dependency verification, `go test -v -race -coverprofile=coverage.out ./...`, coverage verification, and binary build.
-    2. Frontend: Node 22 setup, `npm ci`, `npm run test:coverage`, and `npm run build`.
-    3. Docker: Multi-stage container build verification (`docker compose build`).
-- **OpenAPI 3.1 Specification (`docs/openapi.yaml`):**
-  - Comprehensive specification covering `POST /api/v1/calculate` and `GET /api/v1/health`.
-  - Full request/response schemas, binary/unary examples, and structured error taxonomy (400, 405, 413, 422, 500).
-- **Production `README.md`:**
-  - Complete architectural documentation, Mermaid ASCII diagrams, zero-config quick start, Makefile command catalog, trade-off rationales, cURL examples, test coverage matrices, and audit trail references.
+~~~markdown
+# PHASE 1 EXECUTION PROMPT: REPOSITORY SCAFFOLDING, TOOLING & GUARDRAILS
 
-### 3. Verification Gate Record
-- **Docker Compose Image Build:** `docker compose build` completed cleanly, building `calculator-backend:latest` and `calculator-frontend:latest`.
-- **Docker Compose Live Smoke Test:** `./scripts/smoke-test.sh` executed against running container stack, passing all 4 smoke tests (backend health, frontend HTTP 200, reverse-proxy 0.1 + 0.2 = 0.3 calculation, and 422 division-by-zero error).
-- **Clean Container Teardown:** `docker compose down` stopped and removed all containers and networks.
-- **Working Tree:** Pristine git state on branch `main`.
+## 1. ROLE & ARCHITECTURAL DIRECTIVES
+You are an autonomous Full-Stack Implementation Agent executing **Phase 1 of 6** for the Sezzle Calculator assessment under Staff Architect supervision.
+
+- **Language Policy:** All code, identifiers, comments, commit messages, documentation, and test cases MUST be exclusively in English.
+- **Execution Mode:** Use non-interactive CLI flags (`--yes`, `-y`) so terminal commands never hang waiting for user input.
+- **Phase 1 Scope Boundary:** Set up the Git repository, directory layout, engineering rules (`AGENT_RULES.md` / `.cursorrules`), root `Makefile`, initial `docs/AI_PROMPTS.md`, and minimal compilable/testable skeletons for both `backend/` and `frontend/`. Do NOT implement the full calculator domain or UI logic yet.
+
+---
+
+## 2. STEP-BY-STEP SPECIFICATIONS
+
+### Step 1: Git Initialization & Directory Scaffolding
+1. Initialize Git on branch `main` (if not already initialized) and configure the `origin` remote to `https://github.com/Juanda2005123/sezzle_calculator.git`.
+2. Create the required project directory tree:
+   - `.github/workflows/`
+   - `backend/cmd/api/`
+   - `backend/internal/apperror/`
+   - `backend/internal/calculator/`
+   - `backend/internal/transport/http/`
+   - `frontend/src/{api,components,hooks,types}/`
+   - `docs/`
+   - `scripts/`
+3. Create a root `.gitignore` covering Go binaries/coverage outputs (`backend/bin/`, `coverage.out`), Node artifacts (`node_modules/`, `dist/`, `coverage/`), `.env*` files, and IDE/OS metadata.
+
+### Step 2: Engineering Guardrails (`AGENT_RULES.md` & `.cursorrules`)
+Create `AGENT_RULES.md` in the repository root and copy it to `.cursorrules`. It must codify these non-negotiable project rules:
+- **English-Only Mandate:** 100% English across code, comments, errors, commits, and docs.
+- **Backend Standards (Go 1.22+):**
+  - Module path: `github.com/Juanda2005123/sezzle_calculator/backend`
+  - **Arithmetic Precision:** Never use native `float64` for base-10 arithmetic (`add`, `subtract`, `multiply`, `divide`, `percent`). Always use `github.com/shopspring/decimal`. For irrational operations (`sqrt`, fractional `power`), validate domain constraints first, compute with guard precision, and round deterministically to 16 decimal places (`MaxPrecision = 16`) with trailing zeros stripped on formatted output.
+  - **Error Taxonomy & HTTP Status Codes:** Never leak `500 Internal Server Error` on user input. Use a standardized JSON error envelope (`{"error": {"code": "...", "message": "...", "details": "..."}}`):
+    - `400 Bad Request`: `ERR_MALFORMED_JSON`, `ERR_INVALID_OPERAND`, `ERR_UNSUPPORTED_OPERATION`, `ERR_INVALID_ARITY`.
+    - `422 Unprocessable Entity`: `ERR_DIVISION_BY_ZERO`, `ERR_NEGATIVE_RADICAND`, `ERR_COMPLEX_RESULT`, `ERR_NUMERIC_OVERFLOW`.
+    - `405 Method Not Allowed` (`ERR_METHOD_NOT_ALLOWED`) & `413 Content Too Large` (`ERR_PAYLOAD_TOO_LARGE` via 4KB `http.MaxBytesReader`).
+- **Frontend Standards (React + TypeScript):**
+  - Strict TypeScript (`strict: true`, zero `any` types).
+  - Clean separation between `src/api/` (HTTP client), `src/hooks/` (reducer state machine & keyboard listeners), and `src/components/` (presentational UI).
+  - Accessibility: `role="status"` and `aria-live="polite"` on the calculator display, `role="alert"` on error banners, explicit `aria-label` on operator buttons, and full physical keyboard navigation.
+- **Testing Standards:**
+  - Go: Table-driven unit and `httptest` suites running with `-race` and targeting >90% coverage.
+  - Frontend: Vitest + React Testing Library targeting >85% coverage.
+
+### Step 3: Root `Makefile`
+Create a root `Makefile` (using valid TAB indentation) with the following phony targets:
+- `dev-backend`: Runs the Go API (`cd backend && go run ./cmd/api`).
+- `dev-frontend`: Runs the Vite dev server (`cd frontend && npm run dev`).
+- `test-backend`: Runs Go tests with race detection (`cd backend && go test -v -race ./...`).
+- `coverage-backend`: Runs Go tests with coverage profile and outputs function-level summary (`go tool cover -func=coverage.out`).
+- `test-frontend`: Runs Vitest in single-run mode (`cd frontend && npm run test -- --run`).
+- `coverage-frontend`: Runs Vitest coverage (`cd frontend && npm run test:coverage`).
+- `build`: Compiles the Go binary to `backend/bin/calculator-api` and builds the frontend production bundle.
+- `docker-up`, `docker-down`, and `smoke-test` (`./scripts/smoke-test.sh`).
+
+### Step 4: Backend Skeleton (`backend/`)
+1. Initialize the Go module as `github.com/Juanda2005123/sezzle_calculator/backend` and install `github.com/shopspring/decimal@v1.4.0`.
+2. Implement a minimal, compilable `backend/cmd/api/main.go` that:
+   - Verifies `shopspring/decimal` linkage by computing `0.1 + 0.2` and supporting a quick CLI check mode (e.g., if `SMOKE_CHECK=1`, print the exact decimal result `"0.3"` and exit `0`).
+   - Starts an HTTP server on `PORT` (default `8080`) using standard `net/http` (`http.NewServeMux`) with a `GET /api/v1/health` endpoint returning `200 OK` and `{"status":"healthy"}`.
+3. Run `go mod tidy` so `go.mod` and `go.sum` are clean.
+
+### Step 5: Frontend Skeleton (`frontend/`)
+1. Scaffold the Vite React + TypeScript project non-interactively while preserving the `src/{api,components,hooks,types}` subdirectories.
+2. Install dependencies:
+   - Production: `lucide-react`
+   - Styling: `tailwindcss` and `@tailwindcss/vite` (Tailwind CSS v4 Vite plugin setup; import `@import "tailwindcss";` in `src/index.css`).
+   - Testing: `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@vitest/coverage-v8`.
+3. Configure `vite.config.ts`:
+   - Register the React and `@tailwindcss/vite` plugins.
+   - Configure `server.proxy` so `/api` proxies to `http://localhost:8080` (`changeOrigin: true`).
+   - Configure `test` for Vitest (`globals: true`, `environment: 'jsdom'`, `setupFiles` importing `@testing-library/jest-dom`, and `v8` coverage reporter).
+4. Ensure `tsconfig.json` / `tsconfig.app.json` enforces `strict: true` and includes `"vitest/globals"` and `"@testing-library/jest-dom"` in `types`.
+5. Ensure `package.json` defines `"test": "vitest"` and `"test:coverage": "vitest run --coverage"`.
+6. Replace the default Vite boilerplate in `src/App.tsx` with a minimal placeholder component rendering the heading `"Sezzle Precision Calculator"`, and write a passing smoke test in `src/App.test.tsx` using React Testing Library that asserts this heading renders.
+
+### Step 6: Initialize Prompt Audit Log (`docs/AI_PROMPTS.md`)
+Create `docs/AI_PROMPTS.md` documenting the workflow, guardrails, and Phase 1 verification results.
+
+---
+
+## 3. MANDATORY ACCEPTANCE CRITERIA & VERIFICATION GATE
+```bash
+git remote -v
+git status -s
+cd backend && SMOKE_CHECK=1 go run ./cmd/api && go build -o ./bin/calculator-api ./cmd/api && cd ..
+cd frontend && npm run build && npm run test -- --run && cd ..
+```
+~~~
+
+**Verification Gate Result:** Passed (`SMOKE_CHECK=1` printed `0.3`, `calculator-api` binary built cleanly, Vite production build succeeded in 620ms, Vitest initial smoke test passed).
+</details>
+
+<details>
+<summary><strong>Phase 2 Prompt: Backend Domain Engine & Table-Driven Unit Test Suite</strong> (Click to expand)</summary>
+
+~~~markdown
+# PHASE 2 EXECUTION PROMPT: BACKEND DOMAIN ENGINE & UNIT TEST SUITE
+
+## 1. ROLE & EXECUTION CONTEXT
+You are an autonomous Full-Stack Implementation Agent executing **Phase 2 of 6** for the Sezzle Calculator assessment.
+- Read `AGENT_RULES.md` before writing code. All code, comments, error messages, and commit messages MUST be 100% in English.
+- **Host Environment Note (Windows):** `go` is installed at `C:\Program Files\Go\bin`. Ensure it is in `$env:Path` for shell commands. Because the Windows host does not use CGO/`gcc`, omit `-race` during local Windows `go test` runs, and always quote Go coverage flags in PowerShell (`go test -v "-coverprofile=coverage.out" ./...` and `go tool cover "-func=coverage.out"`). Do NOT install external system packages via `winget` or `choco`.
+- **Phase 2 Scope Boundary:** Implement the backend domain error package (`backend/internal/apperror`) and the pure arbitrary-precision arithmetic engine (`backend/internal/calculator`) along with exhaustive table-driven unit tests. Do NOT modify the HTTP transport layer yet (that is Phase 3).
+
+---
+
+## 2. PACKAGE SPECIFICATIONS & CONTRACTS
+
+### A. Domain & Application Errors (`backend/internal/apperror`)
+Create `errors.go` and `errors_test.go` in `package apperror`:
+1. **Error Structure:** Define an `AppError` struct that implements the standard `error` interface:
+   - `Code` (`string`, `json:"code"`)
+   - `Message` (`string`, `json:"message"`)
+   - `Details` (`string`, `json:"details,omitempty"`)
+   - `HTTPStatus` (`int`, `json:"-"`)
+2. **Standard Error Codes & Constructors:**
+   - **HTTP 400 (`http.StatusBadRequest`):**
+     - `ERR_MALFORMED_JSON` — Invalid JSON syntax, empty payload, or unknown fields.
+     - `ERR_INVALID_OPERAND` — Missing/null required operand, or non-numeric/NaN/Infinite operand value.
+     - `ERR_UNSUPPORTED_OPERATION` — Operation is not one of the 7 supported tokens.
+     - `ERR_INVALID_ARITY` — Missing `operand_b` for binary operations, or unexpected non-null `operand_b` for unary-only operations (`sqrt`).
+   - **HTTP 422 (`http.StatusUnprocessableEntity`):**
+     - `ERR_DIVISION_BY_ZERO` — Division by zero (`a / 0`) or zero raised to a negative exponent (`0 ^ -b`).
+     - `ERR_NEGATIVE_RADICAND` — Square root of a negative number (`sqrt(a)` where `a < 0`).
+     - `ERR_COMPLEX_RESULT` — Negative base raised to a non-integer exponent (`a ^ b` where `a < 0` and `b` is fractional).
+     - `ERR_NUMERIC_OVERFLOW` — Input or output magnitude exceeds `10^1000`, or exponent magnitude `|b| > 10000`.
+   - **HTTP 405, 413, 500:**
+     - `ERR_METHOD_NOT_ALLOWED` (`405`), `ERR_PAYLOAD_TOO_LARGE` (`413`), `ERR_INTERNAL` (`500`).
+3. Write unit tests in `errors_test.go` verifying constructor fields, status codes, `Error()` string formatting, and `errors.As` unwrapping.
+
+---
+
+### B. Arbitrary-Precision Calculator Engine (`backend/internal/calculator`)
+Create `service.go` and `service_test.go` in `package calculator` using `github.com/shopspring/decimal` (and `math/big` where needed for high-precision roots/powers).
+
+#### 1. Supported Operations (`Operation` string type)
+- `"add"` (`+`) — Binary
+- `"subtract"` (`-`) — Binary
+- `"multiply"` (`*`) — Binary
+- `"divide"` (`/`) — Binary
+- `"power"` (`^`) — Binary
+- `"sqrt"` (`√`) — Unary
+- `"percent"` (`%`) — Dual-Arity (Unary when `OperandB == nil`; Binary when `OperandB != nil`)
+
+#### 2. Input & Output Contracts
+- **Input:** `Operation`, `OperandA decimal.Decimal`, `OperandB *decimal.Decimal` (pointer to distinguish omitted/null vs zero).
+- **Output (`CalculationResult`):**
+  - `Operation` (`Operation`)
+  - `OperandA` (`string`) — Normalized canonical string of `OperandA` (with `-0` normalized to `"0"`).
+  - `OperandB` (`*string`) — Normalized canonical string of `OperandB` if non-nil, else `nil`.
+  - `Result` (`decimal.Decimal`) — Exact decimal value rounded to at most `MaxPrecision = 16` decimal places.
+  - `Formatted` (`string`) — Clean decimal string with trailing fractional zeros stripped (e.g., `12.000` -> `"12"`, `0.3000` -> `"0.3"`, `-0` -> `"0"`).
+  - `Expression` (`string`) — Human-readable equation string:
+    - Standard Binary (`add`, `subtract`, `multiply`, `divide`, `power`): `"<OperandA> <symbol> <OperandB> = <Formatted>"`
+    - Binary `percent`: `"<OperandA>% of <OperandB> = <Formatted>"`
+    - Unary `percent`: `"<OperandA>% = <Formatted>"`
+    - Unary `sqrt`: `"sqrt(<OperandA>) = <Formatted>"`
+
+#### 3. Mathematical & Boundary Rules (Strict Enforcement)
+- **Precision & Guard Digits:** `MaxPrecision = 16` for final output rounding; 32 guard digits on intermediate division (`a.DivRound(b, 32).Round(16)`).
+- **Overflow Protection (`ERR_NUMERIC_OVERFLOW`):** Max magnitude $10^{1000}$ (`decimal.New(1, 1000)`).
+- **Arity Validation (`ERR_INVALID_ARITY`):** Require `OperandB` on binary ops; forbid `OperandB` on `sqrt`.
+- **Operation-Specific Edge Cases:**
+  - `divide`: `OperandB.IsZero()` -> `ERR_DIVISION_BY_ZERO`.
+  - `sqrt`: `OperandA.IsNegative()` -> `ERR_NEGATIVE_RADICAND`; high-precision `big.Float` root supporting magnitudes above `math.MaxFloat64` (`sqrt(1e400) = 1e200`).
+  - `power`: $0^{-n}$ -> `ERR_DIVISION_BY_ZERO`; $0^0 = 1$; negative base + fractional exponent -> `ERR_COMPLEX_RESULT`; $\vert{}b\vert{} > 10000$ (except $a \in \{-1,0,1\}$) or $\log_{10}(\vert{}a\vert{}) \times b > 1000$ -> `ERR_NUMERIC_OVERFLOW`.
+  - `percent`: Unary $a / 100$; Binary $(a \times b) / 100$.
+
+---
+
+## 3. TABLE-DRIVEN UNIT TEST REQUIREMENTS (`service_test.go`)
+Cover standard arithmetic, IEEE 754 traps (`0.1 + 0.2 = 0.3`), repeating/irrational decimals (`1/3`, `sqrt(2)`), high-magnitude `sqrt(1e400)`, exponentiation edge cases, unary/binary percentage modes, `-0` normalization, and all domain/arity error codes.
+
+## 4. MANDATORY ACCEPTANCE CRITERIA & VERIFICATION GATE
+- 100% of unit tests in `internal/apperror` and `internal/calculator` must pass.
+- Statement coverage for `internal/apperror` and `internal/calculator` must be **>= 95%**.
+~~~
+
+**Verification Gate Result:** Passed (`internal/apperror`: **100.0%** coverage, `internal/calculator`: **95.5%** coverage; committed as `d1eba8c`).
+</details>
+
+<details>
+<summary><strong>Phase 3 Prompt: Backend HTTP Transport, Middleware & httptest Integration Suite</strong> (Click to expand)</summary>
+
+~~~markdown
+# PHASE 3 EXECUTION PROMPT: BACKEND HTTP TRANSPORT, MIDDLEWARE & HTTPTEST INTEGRATION SUITE
+
+## 1. ROLE & EXECUTION CONTEXT
+You are an autonomous Full-Stack Implementation Agent executing **Phase 3 of 6** for the Sezzle Calculator assessment.
+- Read `AGENT_RULES.md` before writing code. All code, comments, error messages, and commit messages MUST be 100% in English.
+- **Phase 3 Scope Boundary:** Implement the HTTP transport layer in `backend/internal/transport/http`, write comprehensive HTTP integration tests using `net/http/httptest`, and refactor `backend/cmd/api/main.go` (and `main_test.go`) to use the new HTTP router and remove temporary Phase 1 scaffolding (`CalculateDecimalSum`).
+
+---
+
+## 2. ARCHITECTURAL SPECIFICATIONS (`backend/internal/transport/http`)
+
+### A. Request/Response DTOs & Custom Operand Parsing (`dto.go`)
+1. **Flexible Operand Type (`Operand`):**
+   - Implement a custom type that unmarshals JSON numbers (`0.1`, `-42`, `1e5`) AND JSON strings (`"0.1"`, `" -42.5 "`) directly into `decimal.Decimal` without passing through `float64`.
+   - Reject booleans (`true`/`false`), arrays, objects, empty strings, `"NaN"`, `"Infinity"`, `"-Infinity"`, or unparseable strings by returning an `apperror.NewInvalidOperandError(...)`.
+2. **Calculation Request (`CalculateRequest`):**
+   - `Operation` (`string`, `json:"operation"`), `OperandA` (`*Operand`, `json:"operand_a"`), `OperandB` (`*Operand`, `json:"operand_b,omitempty"`).
+3. **Success Response Envelope (`CalculateResponse`):**
+   - Serialize `"result"` as `json.Number` (initialized from `CalculationResult.Formatted`) and `"formatted"` as `string`.
+4. **Error Response Envelope (`ErrorResponse`):**
+   - Standardized `{"error": {"code": "...", "message": "...", "details": "..."}}`.
+
+### B. HTTP Handlers (`handler.go`), Middleware (`middleware.go`) & Router (`router.go`)
+1. `GET /api/v1/health` -> `200 OK` (`{"status":"healthy"}`).
+2. `POST /api/v1/calculate` -> Enforce 4096-byte payload limit (`http.MaxBytesReader` -> `413 ERR_PAYLOAD_TOO_LARGE`), `decoder.DisallowUnknownFields()`, `decoder.UseNumber()`, and trailing token EOF verification.
+3. Non-POST requests to `/api/v1/calculate` -> `405 Method Not Allowed` (`ERR_METHOD_NOT_ALLOWED`).
+4. **CORS Middleware:** Configurable `ALLOWED_ORIGINS` (default `*`), `OPTIONS` preflight returning `204 No Content`.
+5. **Panic Recovery Middleware:** Catches unexpected runtime panics, logs via `log/slog`, and returns `500 Internal Server Error` (`ERR_INTERNAL`).
+
+---
+
+## 3. HTTP INTEGRATION TEST SUITE REQUIREMENTS (`handler_test.go`)
+Using `net/http/httptest`, test health check, happy paths (numbers, strings, unary/binary ops), 400 contract errors (malformed JSON, unknown fields, invalid operands, unsupported op, arity mismatch), 422 domain errors, 405 method not allowed, 204 CORS preflight, 413 payload > 4KB, and 500 panic recovery.
+
+## 4. MANDATORY ACCEPTANCE CRITERIA & VERIFICATION GATE
+- Statement coverage in `internal/transport/http` must be **>= 90%**, and total backend statement coverage must be **>= 90%**.
+~~~
+
+**Verification Gate Result:** Passed (`internal/transport/http`: **97.2%** coverage, total backend coverage: **90.4%**; committed as `caab52a`).
+</details>
+
+<details>
+<summary><strong>Phase 4 Prompt: Frontend API Client, State Machine Hook, Keyboard Navigation & Accessible UI</strong> (Click to expand)</summary>
+
+~~~markdown
+# PHASE 4 EXECUTION PROMPT: FRONTEND API CLIENT, STATE MACHINE HOOK & ACCESSIBLE UI
+
+## 1. ROLE & EXECUTION DIRECTIVES
+You are an autonomous Full-Stack Implementation Agent executing **Phase 4 of 6** for the Sezzle Calculator assessment.
+- Read `AGENT_RULES.md` before writing code. All code, comments, UI copy, ARIA labels, and commit messages MUST be 100% in English.
+- **Workspace Boundary:** Operate strictly inside the repository root (`c:\Dev\sezzle\calculator`).
+- **Phase 4 Scope Boundary:** Implement the complete React + TypeScript frontend (`src/types`, `src/api`, `src/hooks`, `src/components`, `src/App.tsx`).
+
+---
+
+## 2. FRONTEND ARCHITECTURAL SPECIFICATIONS
+
+### A. Shared TypeScript Contracts (`frontend/src/types/calculator.ts`)
+Enforce `strict: true` with zero `any` types (`Operation`, `CalculateRequest`, `CalculationData`, `CalculateResponse`, `ApiErrorDetail`, `ErrorResponse`, `HistoryItem`).
+
+### B. HTTP Service Client (`frontend/src/api/calculatorApi.ts`)
+- `CalculatorApiError` with `status`, `code`, `message`, `details`.
+- `calculate(payload, signal)` with 8000ms timeout controller, structured error parsing, and `ERR_NETWORK` mapping on connection failures.
+- `checkHealth()` verifying `GET /api/v1/health`.
+
+### C. Calculator State Machine Hook (`frontend/src/hooks/useCalculator.ts`)
+- Manage `displayValue`, `previousOperand`, `pendingOperation`, `expressionPreview`, `isWaitingForOperand`, `isLoading`, `error`, and `history` (up to 10 items).
+- Enforce 24-character digit limit, leading zero suppression, single decimal guard, sign toggling, backspace, `clearAll`, immediate unary `sqrt`, dual-mode `percent` (unary standalone vs. binary percentage), operator switching, and chained calculation evaluation.
+
+### D. Physical Keyboard Navigation Hook (`frontend/src/hooks/useKeyboardShortcuts.ts`)
+- Map `0-9`, `.`, `+`, `-`, `*`/`x`, `/` (`preventDefault`), `^`, `%`, `r`/`R` (`sqrt`), `Enter`/`=` (`preventDefault`), `Backspace`, and `Escape` (`clearAll`), ignoring combinations with `Ctrl`/`Alt`/`Meta` and triggering visual active feedback on keypad buttons.
+
+### E. Accessible, Responsive UI Components (`frontend/src/components/` & `App.tsx`)
+- `Display.tsx` (`role="status"`, `aria-live="polite"`, `data-testid="calculator-display"`).
+- `ErrorBanner.tsx` (`role="alert"`, `aria-live="assertive"`, `data-testid="error-banner"`).
+- `Keypad.tsx` (4-column CSS Grid with explicit `aria-label` on all operators/utilities and `focus-visible:ring-2`).
+- `HistoryPanel.tsx` & `KeyboardReference.tsx`.
+
+## 3. MANDATORY ACCEPTANCE CRITERIA & VERIFICATION GATE
+- `npm run build` (`tsc -b && vite build`) succeeds with **0 TypeScript errors** and **0 warnings**.
+- Zero `any` types across all `.ts` and `.tsx` files in `frontend/src/`.
+~~~
+
+**Verification Gate Result:** Passed (`tsc -b && vite build` succeeded with 0 errors and 0 `any` types, 20 initial unit tests passing; committed as `c231b15`).
+</details>
+
+<details>
+<summary><strong>Phase 5 Prompt: Exhaustive Frontend Test Suite (>= 85% Coverage) & Live Chromium E2E Verification</strong> (Click to expand)</summary>
+
+~~~markdown
+# PHASE 5 EXECUTION PROMPT: EXHAUSTIVE FRONTEND TEST SUITE (>= 85% COVERAGE) & LIVE CHROMIUM E2E VERIFICATION
+
+## 1. ROLE & EXECUTION DIRECTIVES
+You are an autonomous Full-Stack Implementation Agent executing **Phase 5 of 6** for the Sezzle Calculator assessment.
+- **Phase 5 Scope Boundary:**
+  1. Expand the Vitest + React Testing Library unit and component integration test suite so statement, branch, function, and line coverage across `frontend/src` exceeds **85%** (aim for **>90%**).
+  2. Start the live Go backend (`:8080`) and Vite frontend (`:5173`) and use your **integrated Chromium browser** to execute a live End-to-End (E2E) visual, functional, and accessibility verification across the full stack, then cleanly terminate the background dev servers before committing.
+
+---
+
+## 2. PART 1: VITEST & REACT TESTING LIBRARY COVERAGE SPECIFICATIONS
+Test full user journeys in `App.test.tsx` and component/hook suites:
+1. Core Binary Operations & IEEE 754 Precision Flow (`0.1 + 0.2 = 0.3`).
+2. Advanced Operations (`sqrt(144) = 12`, `2 ^ 3 = 8`, unary `50% = 0.5`, binary `150 + 20% = 30`).
+3. Chained Operations & Operator Switching.
+4. Domain Error Presentation & Recovery (`role="alert"` on `9 / 0`, dismiss button, `AC` reset).
+5. Input Utilities (`AC`, `DEL`, `±`, multiple decimal point prevention).
+6. Calculation History Panel & Keyboard Reference interactions.
+7. Physical Keyboard Integration (`keydown` events driving `<App/>`).
+8. API client edge cases (400/422 JSON errors, non-JSON 500 fallback, network error `ERR_NETWORK`, `AbortSignal`, `checkHealth`).
+
+---
+
+## 3. PART 2: LIVE FULL-STACK E2E VERIFICATION VIA INTEGRATED CHROMIUM
+1. Start the Go backend (`:8080`) and Vite dev server (`:5173`).
+2. Drive headless Chromium against `http://localhost:5173`:
+   - Verify 0 console errors.
+   - Verify `0.1 + 0.2 = 0.3` round-trip and DOM history entry.
+   - Verify `sqrt(144) = 12` and `12 ^ 2 = 144`.
+   - Verify `42 ÷ 0 =` renders the `role="alert"` `ERR_DIVISION_BY_ZERO` banner and dismisses cleanly.
+   - Verify keyboard input (`5`, `0`, `%` -> `0.5`) and responsive viewport layout (no horizontal overflow).
+3. Terminate background servers and release ports `8080` and `5173`.
+~~~
+
+**Verification Gate Result:** Passed (**98.39%** statement coverage, **95.85%** branch coverage, **97.43%** function coverage across 9 test files / 62 tests; headless Chromium CDP E2E suite verified all 4 live scenarios with 0 console errors; committed as `d95f850`).
+</details>
+
+<details>
+<summary><strong>Phase 6 Prompt: Containerization, Smoke Testing, CI Workflow, OpenAPI 3.1 Spec & Production README</strong> (Click to expand)</summary>
+
+~~~markdown
+# PHASE 6 EXECUTION PROMPT: CONTAINERIZATION, SMOKE TESTING, CI, OPENAPI & PRODUCTION README
+
+## 1. ROLE & EXECUTION DIRECTIVES
+You are an autonomous Full-Stack Implementation Agent executing the final phase (**Phase 6 of 6**) for the Sezzle Calculator assessment.
+- **Phase 6 Scope Boundary:** Implement Docker containerization assets (`backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `docker-compose.yml`), automated smoke testing (`scripts/smoke-test.sh`), GitHub Actions CI workflow (`.github/workflows/ci.yml`), OpenAPI 3.1 specification (`docs/openapi.yaml`), and the production-grade `README.md`.
+
+---
+
+## 2. PHASE 6 DELIVERABLES SPECIFICATION
+- **A. Backend Containerization (`backend/Dockerfile`):** Multi-stage build (`golang:1.24-alpine` -> `gcr.io/distroless/static-debian12:nonroot`) with static `calculator-api` and `healthcheck` binaries running as `nonroot:nonroot`.
+- **B. Frontend Containerization & Nginx (`frontend/Dockerfile` & `frontend/nginx.conf`):** Multi-stage build (`node:22-alpine` -> `nginx:1.27-alpine`) serving the SPA on port 80 and reverse-proxying `/api/` to `http://backend:8080/api/`.
+- **C. Unified Orchestration (`docker-compose.yml`):** Orchestrates `backend` (`:8080`) and `frontend` (`:3000`) with `service_healthy` dependency gating.
+- **D. Automated Smoke Testing (`scripts/smoke-test.sh`):** Polls backend health, verifies frontend HTTP 200, tests `0.1 + 0.2 = 0.3` through the Nginx proxy, and verifies `42 / 0 -> 422 ERR_DIVISION_BY_ZERO`.
+- **E. GitHub Actions CI (`.github/workflows/ci.yml`):** Automated Backend Test & Build (`-race`), Frontend Test & Coverage, and Docker Compose Build verification on push/PR.
+- **F. OpenAPI 3.1 Specification (`docs/openapi.yaml`) & Production `README.md`.**
+~~~
+
+**Verification Gate Result:** Passed (`docker compose build` succeeded, `docker compose up -d && ./scripts/smoke-test.sh` passed all 4 E2E container checks in 1s; committed as `2566253`).
+</details>
+
+---
+
+## 4. Quality Control & Human Engineering Interventions Summary
+
+| Phase | Verification Method | Key Engineering Invariant Verified | Outcome |
+| :--- | :--- | :--- | :---: |
+| **Phase 1** | `SMOKE_CHECK=1 go run ./cmd/api` & `npm run build` | Verified `shopspring/decimal` linkage (`0.1 + 0.2 = 0.3`) and strict TypeScript config. | **PASS** |
+| **Phase 2** | `go test -coverprofile=coverage.out ./internal/...` | Enforced 32 guard digits on division, 16-digit output rounding, `big.Float` fallback for `sqrt(1e400)`, and $10^{1000}$ overflow protection. | **PASS (95.5% / 100%)** |
+| **Phase 3** | `net/http/httptest` integration suite | Custom `Operand` unmarshaler rejecting booleans/NaN/Infinity without `float64` intermediate conversion; 4KB `MaxBytesReader`; panic recovery middleware. | **PASS (97.2%)** |
+| **Phase 4** | `tsc -b && vite build` & static `any` scan | Zero `any` types; `e.preventDefault()` on `Enter` and `/` keys; WAI-ARIA `role="status"` and `role="alert"` live regions. | **PASS (0 errors)** |
+| **Phase 5** | `vitest run --coverage` & Headless Chromium CDP | 62 unit/integration tests + live full-stack browser verification across Go API + Vite proxy. | **PASS (98.39%)** |
+| **Phase 6** | `docker compose up --build -d` & `./scripts/smoke-test.sh` | Static `/bin/healthcheck` binary inside `distroless` image; Nginx `/api/` reverse proxy eliminating cross-origin preflight overhead. | **PASS (4/4 E2E)** |

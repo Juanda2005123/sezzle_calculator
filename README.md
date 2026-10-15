@@ -11,6 +11,10 @@
 
 A production-grade, full-stack calculator application purpose-built for financial and mathematical accuracy. It eliminates IEEE 754 binary floating-point representation drift (guaranteeing exact computations such as `0.1 + 0.2 = 0.3`), enforces deterministic domain invariants, features an accessible WAI-ARIA UI with physical keyboard navigation, and runs seamlessly in containerized environments.
 
+> [!IMPORTANT]
+> **AI Workflow Transparency & Verbatim Prompt Archive:**
+> In accordance with the assessment governance requirements, a complete, immutable audit trail of the **Two-Tier AI Architecture (Human Engineer ↔ Staff Architect ↔ Autonomous Implementer)**—including all 3 Human-to-Architect prompts and all 6 Architect-to-Agent execution prompts with collapsible verbatim text and verification gates—is documented in **[`docs/AI_PROMPTS.md`](./docs/AI_PROMPTS.md)**.
+
 ---
 
 ## Table of Contents
@@ -304,6 +308,13 @@ curl -X GET http://localhost:8080/api/v1/health
 ## Test Coverage Summary
 
 ### Backend Statement Coverage (Go 1.22+)
+To execute the full backend test suite and reproduce the coverage profile:
+```bash
+cd backend
+go test -v "-coverprofile=coverage.out" ./...
+go tool cover "-func=coverage.out"
+```
+
 | Package | Statements | Status |
 | :--- | :--- | :--- |
 | `internal/apperror` | **100.0%** | Exceeds Target |
@@ -312,6 +323,12 @@ curl -X GET http://localhost:8080/api/v1/health
 | **Total Backend Project** | **90.4%** | **PASSED (Threshold $\ge 90\%$)** |
 
 ### Frontend Statement Coverage (React 19 + Vitest V8)
+To execute the full frontend Vitest test suite and reproduce the v8 coverage report:
+```bash
+cd frontend
+npm run test:coverage
+```
+
 | Module / Directory | Statements | Branch | Functions | Lines |
 | :--- | :--- | :--- | :--- | :--- |
 | `src/App.tsx` | 100.0% | 100.0% | 100.0% | 100.0% |
@@ -321,7 +338,7 @@ curl -X GET http://localhost:8080/api/v1/health
 | `src/types` (`calculator.ts`) | 100.0% | 100.0% | 100.0% | 100.0% |
 | **Total Frontend Project** | **98.39%** | **95.85%** | **97.43%** | **98.39%** |
 
-*(Threshold $\ge 85\%$ achieved across all metrics; 62/62 frontend tests passing cleanly)*
+*(Threshold $\ge 85\%$ exceeded across all metrics; 9 test files / 62 tests passing cleanly)*
 
 ---
 
