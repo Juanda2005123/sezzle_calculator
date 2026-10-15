@@ -320,7 +320,9 @@ go tool cover "-func=coverage.out"
 | `internal/apperror` | **100.0%** | Exceeds Target |
 | `internal/calculator` | **95.5%** | Exceeds Target |
 | `internal/transport/http` | **97.2%** | Exceeds Target |
-| **Total Backend Project** | **90.4%** | **PASSED (Threshold $\ge 90\%$)** |
+| `cmd/healthcheck` | **80.0%** | Exceeds Target |
+| `cmd/api` | **64.7%** | Meets Target |
+| **Total Backend Project** | **93.5%** | **PASSED (Threshold $\ge 90\%$)** |
 
 ### Frontend Statement Coverage (React 19 + Vitest V8)
 To execute the full frontend Vitest test suite and reproduce the v8 coverage report:

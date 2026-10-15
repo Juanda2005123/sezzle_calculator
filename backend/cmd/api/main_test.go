@@ -65,3 +65,28 @@ func TestServerRouter_Health(t *testing.T) {
 		t.Errorf("expected 'healthy', got '%s'", resp.Status)
 	}
 }
+
+func TestVerifyEngine(t *testing.T) {
+	engine := calculator.NewEngine()
+	formatted, err := VerifyEngine(engine)
+	if err != nil {
+		t.Fatalf("unexpected error verifying engine: %v", err)
+	}
+	if formatted != "0.3" {
+		t.Errorf("expected 0.3, got %s", formatted)
+	}
+}
+
+func TestBuildServer(t *testing.T) {
+	srv, formatted, err := BuildServer("8081")
+	if err != nil {
+		t.Fatalf("unexpected error building server: %v", err)
+	}
+	if srv.Addr != ":8081" {
+		t.Errorf("expected :8081, got %s", srv.Addr)
+	}
+	if formatted != "0.3" {
+		t.Errorf("expected 0.3, got %s", formatted)
+	}
+}
+
